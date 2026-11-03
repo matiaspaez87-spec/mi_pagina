@@ -28,7 +28,10 @@ MAX_TITULARES = 5
 # Medios considerados confiables. Se compara el dominio de la fuente.
 FUENTES_OK = {
     "latercera.com", "emol.com", "elmercurio.com", "biobiochile.cl", "df.cl",
-    "cooperativa.cl", "elmostrador.cl", "redagricola.com",
+    "cooperativa.cl", "elmostrador.cl",
+    # Medios agrícolas
+    "redagricola.com", "portalfruticola.com", "mundoagro.cl", "simfruit.cl",
+    "odepa.gob.cl", "fedefruta.cl", "frutasdechile.cl", "agrositio.com.ar", "agraria.pe",
     "bbc.com", "dw.com", "france24.com", "reuters.com", "apnews.com", "elpais.com",
     "infobae.com", "lanacion.com.ar", "clarin.com", "ambito.com", "cronista.com",
 }
@@ -47,26 +50,35 @@ def gn(q, pais):
     return "https://news.google.com/rss/search?" + urllib.parse.urlencode(params)
 
 
+MEDIOS_AGRO = ("(site:portalfruticola.com OR site:redagricola.com OR site:mundoagro.cl "
+               "OR site:simfruit.cl OR site:odepa.gob.cl OR site:fedefruta.cl)")
+
+# Orden = orden en la página. Cada sección:
+#   nombre, feeds, máximo de titulares, orden ("fecha" o "relevancia"),
+#   palabras requeridas en el título (vacío = sin filtro).
 SECCIONES = [
-    ("Chile", [gn("Chile when:1d", "CL")]),
-    ("Argentina", [gn("Argentina when:1d", "AR")]),
+    ("🌱 Agro y exportaciones", [
+        gn("(exportaciones agrícolas OR fruta OR cerezas OR fruticultura OR agricultura OR agroindustria) Chile when:2d", "CL"),
+        gn(f"{MEDIOS_AGRO} when:3d", "CL"),
+    ], 6, "fecha", []),
+    ("🚜 Tecnología para el agro", [
+        gn("(agtech OR \"agricultura de precisión\" OR \"riego tecnificado\" OR drones agrícolas "
+           "OR \"agricultura digital\" OR biotecnología agrícola OR tecnología agrícola) when:7d", "CL"),
+        gn("(agtech OR \"agricultura de precisión\" OR tecnología agrícola) when:7d", "AR"),
+    ], 5, "fecha", []),
+    ("Chile", [gn("Chile when:1d", "CL")], 5, "fecha", []),
+    ("Economía Chile", [
+        gn("(dólar OR cobre OR IPSA OR \"Banco Central\" OR inflación) Chile when:1d", "CL"),
+    ], 4, "fecha", ["chile", "cobre", "ipsa", "banco central"]),
     ("Global", [
         "https://feeds.bbci.co.uk/mundo/rss.xml",
         "https://rss.dw.com/rdf/rss-sp-all",
         "https://www.france24.com/es/rss",
-    ]),
-    ("Exportaciones agrícolas chilenas", [
-        gn("exportaciones agrícolas Chile OR fruta chilena exportación OR cerezas exportación when:2d", "CL"),
-    ]),
-    ("Tecnología para el agro", [
-        gn("tecnología agricultura OR agtech OR riego inteligente OR agricultura digital when:3d", "CL"),
-    ]),
-    ("Economía", [
-        gn("dólar Chile OR cobre OR IPSA OR Banco Central when:1d", "CL"),
-    ]),
-    ("Salud y fitness", [
-        gn("salud OR ejercicio OR fitness OR nutrición when:2d", "CL"),
-    ]),
+    ], 4, "fecha", []),
+    # Portada de Google News Argentina: viene ordenada por relevancia.
+    ("Argentina (lo más relevante)", [
+        "https://news.google.com/rss?hl=es-419&gl=AR&ceid=AR:es-419",
+    ], 3, "relevancia", []),
 ]
 
 
@@ -148,20 +160,24 @@ def leer_feed(url):
 def armar_secciones():
     salida = []
     minimo = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
-    for nombre, urls in SECCIONES:
+    vistos = set()  # evita repetir un titular en dos secciones
+    for nombre, urls, maximo, orden, requiere in SECCIONES:
         items = []
         for u in urls:
             items += leer_feed(u)
-        items.sort(key=lambda x: x["fecha"] or minimo, reverse=True)
+        if orden == "fecha":
+            items.sort(key=lambda x: x["fecha"] or minimo, reverse=True)
 
-        vistos, sel = set(), []
+        sel = []
         for it in items:
             clave = it["titulo"].lower()[:60]
             if not clave or clave in vistos:
                 continue
+            if requiere and not any(p in it["titulo"].lower() for p in requiere):
+                continue
             vistos.add(clave)
             sel.append({k: v for k, v in it.items() if k != "fecha"})
-            if len(sel) == MAX_TITULARES:
+            if len(sel) == maximo:
                 break
         salida.append({"nombre": nombre, "items": sel})
     return salida
