@@ -251,45 +251,110 @@ PLANTILLA = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#EEF1E7">
 <title>Mi día</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1b;--mute:#6b6b66;--acc:#2f6b4f;--line:#e2e0da}
-@media (prefers-color-scheme: dark){:root{--bg:#161614;--card:#222220;--ink:#eceae4;--mute:#9a9891;--acc:#7fc4a0;--line:#34332f}}
+:root{
+  --neblina:#EEF1E7; --papel:#FAFBF6; --tinta:#1E2620; --hoja:#2F5D3A;
+  --cereza:#A3172E; --tierra:#6E5A47; --cielo:#4F86A0; --linea:#D3DACB;
+  --display:"Bricolage Grotesque",system-ui,sans-serif;
+  --lectura:"Newsreader",Georgia,serif;
+}
+@media (prefers-color-scheme:dark){:root{
+  --neblina:#141A16; --papel:#1B231E; --tinta:#E4EADF; --hoja:#8CC59A;
+  --cereza:#E35A70; --tierra:#B7A28C; --cielo:#79AFC6; --linea:#2C3830;
+}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
-main{max-width:720px;margin:0 auto;padding:16px}
-h1{font-size:1.4rem;margin:.2rem 0 0}
-h2{font-size:1.05rem;margin:0 0 .5rem;color:var(--acc)}
-.muted{color:var(--mute);font-size:.85rem}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
-.alerta{background:#fff3cd;color:#333;border-radius:12px;padding:12px;margin:12px 0}
-@media (prefers-color-scheme: dark){.alerta{background:#4a3f10;color:#f3ecd0}}
-ul{margin:0;padding-left:18px}
-li{margin:.6rem 0}
-li a{color:var(--ink);font-weight:600;text-decoration:none}
-li a:hover{text-decoration:underline}
-.bajada{color:var(--mute);font-size:.92rem;margin:.15rem 0 0}
-.fuente{color:var(--mute);font-size:.8rem}
-.clima{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
-.clima b{display:block;font-size:1.3rem}
-.vs{width:100%;border-collapse:collapse}
-.vs th{font-size:.8rem;color:var(--mute);font-weight:600;text-align:center;padding:4px 6px;border-bottom:1px solid var(--line)}
-.vs th:first-child{text-align:left}
-.vs td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
-.vs td.c{text-align:center;width:60px}
-.vs td.ok{color:var(--acc);font-weight:700}
-.vs td.no{color:var(--mute)}
-.vs input{width:20px;height:20px;cursor:pointer}
-.vs tr.hecho td:first-child{text-decoration:line-through;color:var(--mute)}
-.resumen{display:flex;gap:16px;margin:0 0 8px;font-size:.9rem}
-.resumen b{color:var(--acc)}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--neblina);color:var(--tinta);font:17px/1.55 var(--lectura)}
+.pagina{max-width:1120px;margin:0 auto;padding:28px 20px 64px;display:grid;gap:44px}
+@media (min-width:900px){
+  .pagina{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:64px;padding-top:52px}
+  .dia{align-self:start}
+}
+h1,h2{font-family:var(--display)}
+
+/* Encabezado */
+.saludo{font-family:var(--display);font-size:1rem;color:var(--tierra);margin:0}
+h1{font-size:clamp(2.4rem,8vw,3.5rem);line-height:1;letter-spacing:-.025em;font-weight:800;margin:.12em 0 .3em}
+.actualizado{font-family:var(--display);font-size:.8rem;color:var(--tierra);margin:0 0 30px}
+
+/* Clima: rango del día sobre una escala fija de -5 a 40 °C */
+.clima{margin:0 0 34px}
+.temps{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font-family:var(--display)}
+.temps .ahora{font-size:3.4rem;font-weight:800;line-height:1;letter-spacing:-.04em}
+.temps .rango{font-size:.95rem;color:var(--tierra)}
+.escala{position:relative;height:10px;border-radius:5px;background:var(--linea);margin:16px 0 6px}
+.escala .tramo{position:absolute;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,#6FA3B8,#D9A23A 55%,var(--cereza))}
+.escala .marca{position:absolute;top:-6px;width:4px;height:22px;border-radius:2px;background:var(--tinta);transform:translateX(-50%);transition:left 1s cubic-bezier(.2,.8,.2,1)}
+.leyenda{display:flex;justify-content:space-between;font-family:var(--display);font-size:.72rem;color:var(--tierra)}
+.lluvia{display:flex;align-items:center;gap:12px;margin-top:16px;font-family:var(--display);font-size:.9rem}
+.lluvia .barra{flex:1;height:6px;border-radius:3px;background:var(--linea);overflow:hidden}
+.lluvia .barra span{display:block;height:100%;background:var(--cielo)}
+.lluvia b{font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
+
+/* Boca */
+.boca{display:grid;grid-template-columns:auto 1fr;column-gap:16px;align-items:center;background:#0E3A73;color:#fff;border-radius:6px;padding:12px 16px 14px;margin:0 0 30px;font-family:var(--display);border-bottom:6px solid #F2B705}
+.boca strong{grid-row:span 2;font-size:1.7rem;font-weight:800;color:#F2B705;letter-spacing:-.02em}
+.boca .cuando{font-weight:600}
+.boca .detalle{font-size:.85rem;opacity:.85}
+
+.bloque{margin:0 0 34px}
+.bloque h2{font-size:1.2rem;font-weight:600;margin:0 0 10px;letter-spacing:-.01em}
+
+/* Agenda */
+.agenda{list-style:none;margin:0;padding:0}
+.agenda li{display:grid;grid-template-columns:4.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
+.agenda .hora{font-family:var(--display);font-weight:600;color:var(--hoja);font-variant-numeric:tabular-nums}
+.agenda .lugar{display:block;font-size:.88rem;color:var(--tierra)}
+.vacio{color:var(--tierra);font-style:italic;margin:0}
+
+/* Checklist: ayer vs hoy */
+.conteo{display:flex;gap:28px;font-family:var(--display);margin:0 0 12px}
+.conteo div{font-size:.85rem;color:var(--tierra)}
+.conteo b{display:block;font-size:1.7rem;line-height:1.1;font-weight:800;color:var(--tinta);font-variant-numeric:tabular-nums}
+.conteo .hoy b{color:var(--cereza)}
+.tareas{list-style:none;margin:0;padding:0}
+.tareas li{display:grid;grid-template-columns:1fr 2.6em 2.8em;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--linea)}
+.tareas li.cabecera{font-family:var(--display);font-size:.75rem;color:var(--tierra);border-top:0;padding:0 0 4px}
+.tareas li.cabecera span+span{text-align:center}
+.tareas label{cursor:pointer}
+.tareas .ayer{justify-self:center;width:12px;height:12px;border-radius:50%;border:2px solid var(--tierra)}
+.tareas .ayer.ok{background:var(--hoja);border-color:var(--hoja)}
+.tareas input{appearance:none;-webkit-appearance:none;justify-self:center;width:28px;height:28px;margin:0;border-radius:50%;border:2px solid var(--cereza);background:transparent;cursor:pointer;display:grid;place-content:center}
+.tareas input:checked{background:var(--cereza)}
+.tareas input:checked::after{content:"";width:7px;height:12px;border:solid var(--neblina);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
+.tareas li.hecha label{color:var(--tierra);text-decoration:line-through;text-decoration-color:var(--cereza)}
+
+/* Titulares */
+.seccion{margin:0 0 40px}
+.seccion h2{font-size:1.3rem;font-weight:600;letter-spacing:-.01em;margin:0;padding-bottom:8px;border-bottom:2px solid var(--tinta)}
+.seccion.destacada{background:var(--papel);border-left:6px solid var(--hoja);border-radius:6px;padding:20px 22px 6px}
+.seccion.destacada h2{font-size:1.6rem;font-weight:800;color:var(--hoja);border-bottom-color:var(--hoja)}
+.noticias{list-style:none;margin:0;padding:0}
+.noticias li{padding:14px 0;border-bottom:1px solid var(--linea)}
+.noticias li:last-child{border-bottom:0}
+.noticias a{color:var(--tinta);text-decoration:none;font-size:1.13rem;line-height:1.3;font-weight:500}
+.noticias a:hover{text-decoration:underline;text-decoration-color:var(--cereza);text-underline-offset:3px}
+.noticias p{margin:6px 0 0;color:var(--tierra);font-size:.95rem;line-height:1.5;max-width:62ch}
+.noticias .fuente{display:block;margin-top:6px;font-family:var(--display);font-size:.78rem;font-weight:600;color:var(--hoja)}
+
+:focus-visible{outline:3px solid var(--hoja);outline-offset:3px;border-radius:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<main>
-<h1 id="fecha"></h1>
-<p class="muted" id="generado"></p>
-<div id="contenido"></div>
+<main class="pagina">
+  <section class="dia" aria-label="Tu día">
+    <p class="saludo" id="saludo"></p>
+    <h1 id="fecha"></h1>
+    <p class="actualizado" id="generado"></p>
+    <div id="dia"></div>
+  </section>
+  <section class="titulares" aria-label="Titulares" id="titulares"></section>
 </main>
 <script>
 const DATA = __DATA__;
@@ -303,99 +368,120 @@ function el(tag, props, ...hijos){
   hijos.flat().forEach(h => { if (h != null) e.append(h); });
   return e;
 }
-const fmtFecha = iso => { const t = new Date(iso + "T12:00:00").toLocaleDateString("es-CL", {weekday:"long", day:"numeric", month:"long"}); return t.charAt(0).toUpperCase() + t.slice(1); };
-const celda = (valor, etiqueta) => el("div", {}, el("b", {text: valor}), el("span", {class: "muted", text: etiqueta}));
-
 const leer = k => { try { return localStorage.getItem(k) === "1"; } catch (e) { return false; } };
 const guardar = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch (e) {} };
-
-function render(d){
-  const c = $("#contenido");
-  c.replaceChildren();
-  $("#fecha").textContent = fmtFecha(d.fecha);
-
-  if (d.boca && d.boca.length) {
-    c.append(el("div", {class: "alerta"},
-      el("b", {text: "⚽ Partido de Boca"}),
-      ...d.boca.map(p => el("div", {text: `${p.hora} · ${p.partido} · ${p.torneo}`}))));
-  }
-
-  if (d.clima) {
-    c.append(el("div", {class: "card"},
-      el("h2", {text: "Clima en Santiago"}),
-      el("div", {class: "clima"},
-        celda(`${d.clima.actual}°`, "Ahora"),
-        celda(`${d.clima.min}° / ${d.clima.max}°`, "Mín / Máx"),
-        celda(`${d.clima.lluvia}%`, "Prob. lluvia"))));
-  }
-
-  const cal = el("div", {class: "card"}, el("h2", {text: "Calendario de hoy"}));
-  if (d.eventos.length) {
-    cal.append(el("ul", {}, ...d.eventos.map(e =>
-      el("li", {text: `${e.hora} · ${e.titulo}${e.lugar ? " · " + e.lugar : ""}`}))));
-  } else {
-    cal.append(el("p", {class: "muted", text: "Sin eventos en el calendario."}));
-  }
-  c.append(cal);
-
-  // Checklist: ayer (solo lectura) vs hoy (marcable). Se guarda por texto de la tarea.
-  const total = DATA.checklist.length;
-  const nAyer = DATA.checklist.filter(t => leer(`chk|${d.ayer}|${t}`)).length;
-  const bHoy = el("b", {});
-  const resumen = el("div", {class: "resumen"},
-    el("span", {}, "Ayer ", el("b", {text: `${nAyer}/${total}`})),
-    el("span", {}, "Hoy ", bHoy));
-  const contarHoy = () => { bHoy.textContent = `${DATA.checklist.filter(t => leer(`chk|${d.hoyChk}|${t}`)).length}/${total}`; };
-
-  const filas = DATA.checklist.map(t => {
-    const ayerOk = leer(`chk|${d.ayer}|${t}`);
-    const claveHoy = `chk|${d.hoyChk}|${t}`;
-    const cb = el("input", {type: "checkbox", "aria-label": t});
-    cb.checked = leer(claveHoy);
-    const tr = el("tr", {class: cb.checked ? "hecho" : ""},
-      el("td", {text: t}),
-      el("td", {class: "c " + (ayerOk ? "ok" : "no"), text: ayerOk ? "✓" : "✗"}),
-      el("td", {class: "c"}, cb));
-    cb.addEventListener("change", () => {
-      guardar(claveHoy, cb.checked);
-      tr.classList.toggle("hecho", cb.checked);
-      contarHoy();
-    });
-    return tr;
-  });
-  contarHoy();
-  c.append(el("div", {class: "card"},
-    el("h2", {text: "Checklist: ayer vs hoy"}),
-    resumen,
-    el("table", {class: "vs"},
-      el("thead", {}, el("tr", {}, el("th", {text: "Tarea"}), el("th", {text: "Ayer"}), el("th", {text: "Hoy"}))),
-      el("tbody", {}, ...filas))));
-
-  const hayNoticias = d.secciones.some(s => s.items.length);
-  if (hayNoticias) c.append(el("h2", {text: "Titulares", style: "margin:18px 0 0"}));
-  d.secciones.forEach(s => {
-    if (!s.items.length) return;
-    c.append(el("div", {class: "card"},
-      el("h2", {text: s.nombre}),
-      el("ul", {}, ...s.items.map(n => el("li", {},
-        el("a", {href: n.link, target: "_blank", rel: "noopener", text: n.titulo}),
-        n.bajada ? el("p", {class: "bajada", text: n.bajada}) : null,
-        el("div", {class: "fuente", text: n.fuente}))))));
-  });
-  if (!hayNoticias) {
-    c.append(el("div", {class: "card muted", text: "No se pudieron cargar titulares en esta actualización."}));
-  }
-}
-
-// El checklist usa la fecha real del dispositivo, no la de la última actualización,
-// para que "hoy" y "ayer" sean correctos aunque la página no se haya regenerado.
+const fmtFecha = iso => {
+  const t = new Date(iso + "T12:00:00").toLocaleDateString("es-CL", {weekday: "long", day: "numeric", month: "long"});
+  return t.charAt(0).toUpperCase() + t.slice(1);
+};
 const isoLocal = f => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+
+// "Hoy" y "ayer" del checklist salen del reloj del dispositivo.
 const ahora = new Date();
 const ayerF = new Date(ahora); ayerF.setDate(ahora.getDate() - 1);
-DATA.hoyChk = isoLocal(ahora);
-DATA.ayer = isoLocal(ayerF);
-$("#generado").textContent = "Actualizado " + DATA.generado;
-render(DATA);
+const HOY = isoLocal(ahora), AYER = isoLocal(ayerF);
+
+function encabezado(){
+  const h = ahora.getHours();
+  $("#saludo").textContent = (h < 12 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches") + ", Matías";
+  $("#fecha").textContent = fmtFecha(DATA.fecha);
+  const [f, hora] = DATA.generado.split(" ");
+  $("#generado").textContent = `Titulares actualizados el ${f} a las ${hora}`;
+}
+
+function bloqueClima(c){
+  const pct = v => Math.min(100, Math.max(0, (v + 5) / 45 * 100));
+  const marca = el("span", {class: "marca", style: `left:${pct(c.min)}%`});
+  const caja = el("div", {class: "clima"},
+    el("div", {class: "temps"},
+      el("span", {class: "ahora", text: `${c.actual}°`}),
+      el("span", {class: "rango", text: `Ahora en Santiago. Mínima ${c.min}°, máxima ${c.max}°.`})),
+    el("div", {class: "escala", role: "img", "aria-label": `Temperatura del día entre ${c.min} y ${c.max} grados`},
+      el("span", {class: "tramo", style: `left:${pct(c.min)}%;width:${pct(c.max) - pct(c.min)}%`}),
+      marca),
+    el("div", {class: "leyenda"}, el("span", {text: "−5°"}), el("span", {text: "40°"})),
+    el("div", {class: "lluvia"},
+      el("span", {text: "Probabilidad de lluvia"}),
+      el("span", {class: "barra"}, el("span", {style: `width:${c.lluvia}%`})),
+      el("b", {text: `${c.lluvia}%`})));
+  // Único movimiento de la página: la marca viaja de la mínima a la temperatura actual.
+  requestAnimationFrame(() => requestAnimationFrame(() => { marca.style.left = `${pct(c.actual)}%`; }));
+  return caja;
+}
+
+function bloqueBoca(partidos){
+  return partidos.map(p => el("div", {class: "boca", role: "status"},
+    el("strong", {text: "Boca"}),
+    el("span", {class: "cuando", text: `Juega hoy a las ${p.hora}`}),
+    el("span", {class: "detalle", text: `${p.partido}, ${p.torneo}`})));
+}
+
+function bloqueAgenda(eventos){
+  const b = el("div", {class: "bloque"}, el("h2", {text: "Agenda de hoy"}));
+  if (!eventos.length) {
+    b.append(el("p", {class: "vacio", text: "No tienes eventos en el calendario hoy."}));
+    return b;
+  }
+  b.append(el("ul", {class: "agenda"}, ...eventos.map(e => el("li", {},
+    el("span", {class: "hora", text: e.hora}),
+    el("span", {}, e.titulo, e.lugar ? el("span", {class: "lugar", text: e.lugar}) : null)))));
+  return b;
+}
+
+function bloqueChecklist(lista){
+  const total = lista.length;
+  const nAyer = lista.filter(t => leer(`chk|${AYER}|${t}`)).length;
+  const bHoy = el("b", {});
+  const contarHoy = () => { bHoy.textContent = `${lista.filter(t => leer(`chk|${HOY}|${t}`)).length}/${total}`; };
+
+  const filas = lista.map((t, i) => {
+    const id = `tarea-${i}`;
+    const clave = `chk|${HOY}|${t}`;
+    const ok = leer(`chk|${AYER}|${t}`);
+    const cb = el("input", {type: "checkbox", id});
+    cb.checked = leer(clave);
+    const li = el("li", {class: cb.checked ? "hecha" : ""},
+      el("label", {for: id, text: t}),
+      el("span", {class: "ayer" + (ok ? " ok" : ""), role: "img", "aria-label": ok ? "Hecha ayer" : "No hecha ayer"}),
+      cb);
+    cb.addEventListener("change", () => { guardar(clave, cb.checked); li.classList.toggle("hecha", cb.checked); contarHoy(); });
+    return li;
+  });
+  contarHoy();
+  return el("div", {class: "bloque"},
+    el("h2", {text: "Checklist"}),
+    el("div", {class: "conteo"},
+      el("div", {}, el("b", {text: `${nAyer}/${total}`}), "Ayer"),
+      el("div", {class: "hoy"}, bHoy, "Hoy")),
+    el("ul", {class: "tareas"},
+      el("li", {class: "cabecera", "aria-hidden": "true"}, el("span", {text: "Tarea"}), el("span", {text: "Ayer"}), el("span", {text: "Hoy"})),
+      ...filas));
+}
+
+function titulares(secciones){
+  const cont = $("#titulares");
+  const llenas = secciones.filter(s => s.items.length);
+  if (!llenas.length) {
+    cont.append(el("p", {class: "vacio", text: "No llegaron titulares en esta actualización. Se vuelven a cargar mañana a las 6:00."}));
+    return;
+  }
+  llenas.forEach(s => {
+    const destacada = /^[\u{1F331}\u{1F69C}]/u.test(s.nombre);
+    cont.append(el("section", {class: "seccion" + (destacada ? " destacada" : "")},
+      el("h2", {text: s.nombre}),
+      el("ul", {class: "noticias"}, ...s.items.map(n => el("li", {},
+        el("a", {href: n.link, target: "_blank", rel: "noopener", text: n.titulo}),
+        n.bajada ? el("p", {text: n.bajada}) : null,
+        el("span", {class: "fuente", text: n.fuente}))))));
+  });
+}
+
+encabezado();
+const dia = $("#dia");
+if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
+if (DATA.clima) dia.append(bloqueClima(DATA.clima));
+dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.checklist));
+titulares(DATA.secciones);
 </script>
 </body>
 </html>
