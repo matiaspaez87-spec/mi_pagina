@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi día</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1b;--mute:#6b6b66;--acc:#2f6b4f;--line:#e2e0da}
+@media (prefers-color-scheme: dark){:root{--bg:#161614;--card:#222220;--ink:#eceae4;--mute:#9a9891;--acc:#7fc4a0;--line:#34332f}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px}
+h1{font-size:1.4rem;margin:.2rem 0 0}
+h2{font-size:1.05rem;margin:0 0 .5rem;color:var(--acc)}
+.muted{color:var(--mute);font-size:.85rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+.alerta{background:#fff3cd;color:#333;border-radius:12px;padding:12px;margin:12px 0}
+@media (prefers-color-scheme: dark){.alerta{background:#4a3f10;color:#f3ecd0}}
+ul{margin:0;padding-left:18px}
+li{margin:.6rem 0}
+li a{color:var(--ink);font-weight:600;text-decoration:none}
+li a:hover{text-decoration:underline}
+.bajada{color:var(--mute);font-size:.92rem;margin:.15rem 0 0}
+.fuente{color:var(--mute);font-size:.8rem}
+.clima{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}
+.clima b{display:block;font-size:1.3rem}
+.vs{width:100%;border-collapse:collapse}
+.vs th{font-size:.8rem;color:var(--mute);font-weight:600;text-align:center;padding:4px 6px;border-bottom:1px solid var(--line)}
+.vs th:first-child{text-align:left}
+.vs td{padding:8px 6px;border-bottom:1px solid var(--line);vertical-align:middle}
+.vs td.c{text-align:center;width:60px}
+.vs td.ok{color:var(--acc);font-weight:700}
+.vs td.no{color:var(--mute)}
+.vs input{width:20px;height:20px;cursor:pointer}
+.vs tr.hecho td:first-child{text-decoration:line-through;color:var(--mute)}
+.resumen{display:flex;gap:16px;margin:0 0 8px;font-size:.9rem}
+.resumen b{color:var(--acc)}
+</style>
+</head>
+<body>
+<main>
+<h1 id="fecha"></h1>
+<p class="muted" id="generado"></p>
+<div id="contenido"></div>
+</main>
+<script>
+const DATA = {"generado": "03/11/2026 18:10", "fecha": "2026-11-03", "checklist": ["Tarea de ejemplo 1 (reemplazar por tu checklist)", "Tarea de ejemplo 2 (reemplazar por tu checklist)"], "clima": null, "boca": [], "eventos": [], "secciones": [{"nombre": "Chile", "items": []}, {"nombre": "Argentina", "items": []}, {"nombre": "Global", "items": []}, {"nombre": "Exportaciones agrícolas chilenas", "items": []}, {"nombre": "Tecnología para el agro", "items": []}, {"nombre": "Economía", "items": []}, {"nombre": "Salud y fitness", "items": []}]};
+const $ = s => document.querySelector(s);
+
+function el(tag, props, ...hijos){
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "text") e.textContent = v; else e.setAttribute(k, v);
+  }
+  hijos.flat().forEach(h => { if (h != null) e.append(h); });
+  return e;
+}
+const fmtFecha = iso => { const t = new Date(iso + "T12:00:00").toLocaleDateString("es-CL", {weekday:"long", day:"numeric", month:"long"}); return t.charAt(0).toUpperCase() + t.slice(1); };
+const celda = (valor, etiqueta) => el("div", {}, el("b", {text: valor}), el("span", {class: "muted", text: etiqueta}));
+
+const leer = k => { try { return localStorage.getItem(k) === "1"; } catch (e) { return false; } };
+const guardar = (k, v) => { try { localStorage.setItem(k, v ? "1" : "0"); } catch (e) {} };
+
+function render(d){
+  const c = $("#contenido");
+  c.replaceChildren();
+  $("#fecha").textContent = fmtFecha(d.fecha);
+
+  if (d.boca && d.boca.length) {
+    c.append(el("div", {class: "alerta"},
+      el("b", {text: "⚽ Partido de Boca"}),
+      ...d.boca.map(p => el("div", {text: `${p.hora} · ${p.partido} · ${p.torneo}`}))));
+  }
+
+  if (d.clima) {
+    c.append(el("div", {class: "card"},
+      el("h2", {text: "Clima en Santiago"}),
+      el("div", {class: "clima"},
+        celda(`${d.clima.actual}°`, "Ahora"),
+        celda(`${d.clima.min}° / ${d.clima.max}°`, "Mín / Máx"),
+        celda(`${d.clima.lluvia}%`, "Prob. lluvia"))));
+  }
+
+  const cal = el("div", {class: "card"}, el("h2", {text: "Calendario de hoy"}));
+  if (d.eventos.length) {
+    cal.append(el("ul", {}, ...d.eventos.map(e =>
+      el("li", {text: `${e.hora} · ${e.titulo}${e.lugar ? " · " + e.lugar : ""}`}))));
+  } else {
+    cal.append(el("p", {class: "muted", text: "Sin eventos en el calendario."}));
+  }
+  c.append(cal);
+
+  // Checklist: ayer (solo lectura) vs hoy (marcable). Se guarda por texto de la tarea.
+  const total = DATA.checklist.length;
+  const nAyer = DATA.checklist.filter(t => leer(`chk|${d.ayer}|${t}`)).length;
+  const bHoy = el("b", {});
+  const resumen = el("div", {class: "resumen"},
+    el("span", {}, "Ayer ", el("b", {text: `${nAyer}/${total}`})),
+    el("span", {}, "Hoy ", bHoy));
+  const contarHoy = () => { bHoy.textContent = `${DATA.checklist.filter(t => leer(`chk|${d.hoyChk}|${t}`)).length}/${total}`; };
+
+  const filas = DATA.checklist.map(t => {
+    const ayerOk = leer(`chk|${d.ayer}|${t}`);
+    const claveHoy = `chk|${d.hoyChk}|${t}`;
+    const cb = el("input", {type: "checkbox", "aria-label": t});
+    cb.checked = leer(claveHoy);
+    const tr = el("tr", {class: cb.checked ? "hecho" : ""},
+      el("td", {text: t}),
+      el("td", {class: "c " + (ayerOk ? "ok" : "no"), text: ayerOk ? "✓" : "✗"}),
+      el("td", {class: "c"}, cb));
+    cb.addEventListener("change", () => {
+      guardar(claveHoy, cb.checked);
+      tr.classList.toggle("hecho", cb.checked);
+      contarHoy();
+    });
+    return tr;
+  });
+  contarHoy();
+  c.append(el("div", {class: "card"},
+    el("h2", {text: "Checklist: ayer vs hoy"}),
+    resumen,
+    el("table", {class: "vs"},
+      el("thead", {}, el("tr", {}, el("th", {text: "Tarea"}), el("th", {text: "Ayer"}), el("th", {text: "Hoy"}))),
+      el("tbody", {}, ...filas))));
+
+  const hayNoticias = d.secciones.some(s => s.items.length);
+  if (hayNoticias) c.append(el("h2", {text: "Titulares", style: "margin:18px 0 0"}));
+  d.secciones.forEach(s => {
+    if (!s.items.length) return;
+    c.append(el("div", {class: "card"},
+      el("h2", {text: s.nombre}),
+      el("ul", {}, ...s.items.map(n => el("li", {},
+        el("a", {href: n.link, target: "_blank", rel: "noopener", text: n.titulo}),
+        n.bajada ? el("p", {class: "bajada", text: n.bajada}) : null,
+        el("div", {class: "fuente", text: n.fuente}))))));
+  });
+  if (!hayNoticias) {
+    c.append(el("div", {class: "card muted", text: "No se pudieron cargar titulares en esta actualización."}));
+  }
+}
+
+// El checklist usa la fecha real del dispositivo, no la de la última actualización,
+// para que "hoy" y "ayer" sean correctos aunque la página no se haya regenerado.
+const isoLocal = f => `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, "0")}-${String(f.getDate()).padStart(2, "0")}`;
+const ahora = new Date();
+const ayerF = new Date(ahora); ayerF.setDate(ahora.getDate() - 1);
+DATA.hoyChk = isoLocal(ahora);
+DATA.ayer = isoLocal(ayerF);
+$("#generado").textContent = "Actualizado " + DATA.generado;
+render(DATA);
+</script>
+</body>
+</html>

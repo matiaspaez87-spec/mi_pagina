@@ -1,0 +1,30 @@
+name: Página diaria
+
+on:
+  schedule:
+    # 09:00 UTC = 06:00 hora de Chile en horario de verano (UTC-3).
+    # En invierno (UTC-4) quedaría a las 05:00: ajustar el cron si cambia la hora.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python generar_pagina.py
+        env:
+          CALENDAR_ICS_URL: ${{ secrets.CALENDAR_ICS_URL }}
+      - name: Publicar cambios
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || (git commit -m "Página del día $(date -u +%F)" && git push)
