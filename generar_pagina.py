@@ -223,7 +223,6 @@ def partidos_boca(fecha):
 
 
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
-DIAS_TAREAS = 7  # tareas que vencen en los próximos N días (más las atrasadas y sin fecha)
 
 
 def google_token():
@@ -285,37 +284,46 @@ def calendario_google(token, desde, hasta, hoy):
 
 
 def tareas_google(token, hoy):
-    """Tareas pendientes de todas tus listas de Google Tasks."""
+    """Checklist desde Google Tasks: las tareas de ayer y las de hoy, con su estado."""
     base = "https://tasks.googleapis.com/tasks/v1"
-    limite = (hoy + dt.timedelta(days=DIAS_TAREAS)).isoformat()
+    hoy_iso = hoy.isoformat()
+    ayer_iso = (hoy - dt.timedelta(days=1)).isoformat()
     listas = google_get(f"{base}/users/@me/lists", token, {"maxResults": "100"}).get("items", [])
-    out = []
+    ayer, de_hoy = [], []
     for lista in listas:
         pagina = None
         while True:
-            params = {"showCompleted": "false", "maxResults": "100"}
+            params = {"showCompleted": "true", "showHidden": "true", "maxResults": "100"}
             if pagina:
                 params["pageToken"] = pagina
             datos = google_get(
                 f"{base}/lists/{urllib.parse.quote(lista['id'], safe='')}/tasks", token, params)
             for t in datos.get("items", []):
                 titulo = (t.get("title") or "").strip()
-                if not titulo or t.get("status") != "needsAction":
+                if not titulo or t.get("deleted"):
                     continue
                 vence = (t.get("due") or "")[:10] or None
-                if vence and vence > limite:
-                    continue
-                out.append({
-                    "titulo": titulo,
-                    "lista": lista.get("title", ""),
-                    "vence": vence,
-                    "atrasada": bool(vence and vence < hoy.isoformat()),
-                })
+                hecho = t.get("status") == "completed"
+                fin = None
+                if t.get("completed"):
+                    fin = dt.datetime.fromisoformat(
+                        t["completed"].replace("Z", "+00:00")).astimezone(TZ).date().isoformat()
+                item = {"id": t["id"], "titulo": titulo, "lista": lista.get("title", ""),
+                        "vence": vence, "hecho": hecho}
+                # Ayer: lo que vencía ayer o lo que completaste ayer.
+                if vence == ayer_iso or fin == ayer_iso:
+                    ayer.append(item)
+                # Hoy: lo completado hoy, y lo pendiente que vence hoy, está atrasado o no tiene fecha.
+                if hecho:
+                    if fin == hoy_iso:
+                        de_hoy.append(item)
+                elif vence is None or vence <= hoy_iso:
+                    de_hoy.append({**item, "atrasada": bool(vence and vence < hoy_iso)})
             pagina = datos.get("nextPageToken")
             if not pagina:
                 break
-    # Atrasadas y de hoy primero, después las próximas, al final las sin fecha.
-    return sorted(out, key=lambda t: (t["vence"] is None, t["vence"] or ""))
+    orden = lambda t: (t["hecho"], t["vence"] is None, t["vence"] or "")  # noqa: E731
+    return {"ayer": sorted(ayer, key=orden), "hoy": sorted(de_hoy, key=orden)}
 
 
 def leer_calendario(desde, hasta):
@@ -410,30 +418,27 @@ h1{font-size:clamp(2.4rem,8vw,3.5rem);line-height:1;letter-spacing:-.025em;font-
 .agenda .lugar{display:block;font-size:.88rem;color:var(--tierra)}
 .vacio{color:var(--tierra);font-style:italic;margin:0}
 
-/* Google Tasks */
-.gtareas{list-style:none;margin:0;padding:0}
-.gtareas li{display:grid;grid-template-columns:5.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
-.gtareas .vence{font-family:var(--display);font-weight:600;font-size:.9rem;color:var(--tierra)}
-.gtareas .vence.atrasada{color:var(--cereza)}
-.gtareas .vence.hoy{color:var(--hoja)}
-.gtareas .lista{display:block;font-size:.85rem;color:var(--tierra)}
-
-/* Checklist: ayer vs hoy */
+/* Checklist: tareas de Google, ayer vs hoy */
 .conteo{display:flex;gap:28px;font-family:var(--display);margin:0 0 12px}
 .conteo div{font-size:.85rem;color:var(--tierra)}
 .conteo b{display:block;font-size:1.7rem;line-height:1.1;font-weight:800;color:var(--tinta);font-variant-numeric:tabular-nums}
 .conteo .hoy b{color:var(--cereza)}
-.tareas{list-style:none;margin:0;padding:0}
-.tareas li{display:grid;grid-template-columns:1fr 2.6em 2.8em;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--linea)}
-.tareas li.cabecera{font-family:var(--display);font-size:.75rem;color:var(--tierra);border-top:0;padding:0 0 4px}
-.tareas li.cabecera span+span{text-align:center}
-.tareas label{cursor:pointer}
-.tareas .ayer{justify-self:center;width:12px;height:12px;border-radius:50%;border:2px solid var(--tierra)}
-.tareas .ayer.ok{background:var(--hoja);border-color:var(--hoja)}
-.tareas input{appearance:none;-webkit-appearance:none;justify-self:center;width:28px;height:28px;margin:0;border-radius:50%;border:2px solid var(--cereza);background:transparent;cursor:pointer;display:grid;place-content:center}
-.tareas input:checked{background:var(--cereza)}
-.tareas input:checked::after{content:"";width:7px;height:12px;border:solid var(--neblina);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
-.tareas li.hecha label{color:var(--tierra);text-decoration:line-through;text-decoration-color:var(--cereza)}
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.vs h3{font-family:var(--display);font-size:.8rem;font-weight:600;color:var(--tierra);margin:0 0 4px}
+.vs ul{list-style:none;margin:0;padding:0}
+.vs li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--linea);font-size:.95rem;line-height:1.35}
+.vs label{cursor:pointer}
+.vs .marca-ayer{margin-top:5px;width:12px;height:12px;border-radius:50%;border:2px solid var(--tierra)}
+.vs .marca-ayer.ok{background:var(--hoja);border-color:var(--hoja)}
+.vs input{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border-radius:50%;border:2px solid var(--cereza);background:transparent;cursor:pointer;display:grid;place-content:center}
+.vs input:checked{background:var(--cereza)}
+.vs input:checked::after{content:"";width:6px;height:11px;border:solid var(--neblina);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
+.vs input:disabled{cursor:default}
+.vs li.hecha label{color:var(--tierra);text-decoration:line-through;text-decoration-color:var(--cereza)}
+.vs .meta{display:block;font-size:.8rem;color:var(--tierra)}
+.vs .meta.atrasada{color:var(--cereza);font-weight:600}
+.vs .vacio{font-size:.9rem;padding:9px 0;border-top:1px solid var(--linea)}
+.nota{font-size:.8rem;color:var(--tierra);margin:12px 0 0}
 
 /* Titulares */
 .seccion{margin:0 0 40px}
@@ -534,60 +539,52 @@ function bloqueAgenda(eventos){
   return b;
 }
 
-function bloqueTareas(tareas){
-  const b = el("div", {class: "bloque"}, el("h2", {text: "Tareas de Google"}));
-  if (tareas == null) {
+function bloqueChecklist(t){
+  const b = el("div", {class: "bloque"}, el("h2", {text: "Checklist"}));
+  if (t == null) {
     b.append(el("p", {class: "vacio", text: "Google Tasks no está conectado. Agrega los secretos de Google en el repositorio para ver tus tareas aquí."}));
     return b;
   }
-  if (!tareas.length) {
-    b.append(el("p", {class: "vacio", text: "No tienes tareas pendientes para esta semana."}));
-    return b;
-  }
-  const etiqueta = t => {
-    if (!t.vence) return ["Sin fecha", ""];
-    if (t.atrasada) return ["Atrasada", " atrasada"];
-    if (t.vence === HOY) return ["Hoy", " hoy"];
-    const txt = new Date(t.vence + "T12:00:00").toLocaleDateString("es-CL", {weekday: "short", day: "numeric"});
-    return [txt.charAt(0).toUpperCase() + txt.slice(1), ""];
-  };
-  b.append(el("ul", {class: "gtareas"}, ...tareas.map(t => {
-    const [txt, clase] = etiqueta(t);
-    return el("li", {},
-      el("span", {class: "vence" + clase, text: txt}),
-      el("span", {}, t.titulo, t.lista ? el("span", {class: "lista", text: t.lista}) : null));
-  })));
-  return b;
-}
-
-function bloqueChecklist(lista){
-  const total = lista.length;
-  const nAyer = lista.filter(t => leer(`chk|${AYER}|${t}`)).length;
+  // Lo marcado en la página se guarda en este dispositivo; lo completado en Google llega con la próxima actualización.
+  const hechaAyer = x => x.hecho || leer(`gt|${AYER}|${x.id}`);
+  const claveHoy = x => `gt|${HOY}|${x.id}`;
+  const nAyer = t.ayer.filter(hechaAyer).length;
   const bHoy = el("b", {});
-  const contarHoy = () => { bHoy.textContent = `${lista.filter(t => leer(`chk|${HOY}|${t}`)).length}/${total}`; };
+  const contarHoy = () => { bHoy.textContent = `${t.hoy.filter(x => x.hecho || leer(claveHoy(x))).length}/${t.hoy.length}`; };
 
-  const filas = lista.map((t, i) => {
-    const id = `tarea-${i}`;
-    const clave = `chk|${HOY}|${t}`;
-    const ok = leer(`chk|${AYER}|${t}`);
-    const cb = el("input", {type: "checkbox", id});
-    cb.checked = leer(clave);
-    const li = el("li", {class: cb.checked ? "hecha" : ""},
-      el("label", {for: id, text: t}),
-      el("span", {class: "ayer" + (ok ? " ok" : ""), role: "img", "aria-label": ok ? "Hecha ayer" : "No hecha ayer"}),
-      cb);
-    cb.addEventListener("change", () => { guardar(clave, cb.checked); li.classList.toggle("hecha", cb.checked); contarHoy(); });
-    return li;
-  });
+  const colAyer = el("div", {class: "col"}, el("h3", {text: "Ayer"}),
+    t.ayer.length
+      ? el("ul", {}, ...t.ayer.map(x => {
+          const ok = hechaAyer(x);
+          return el("li", {},
+            el("span", {class: "marca-ayer" + (ok ? " ok" : ""), role: "img", "aria-label": ok ? "Hecha" : "No hecha"}),
+            el("span", {text: x.titulo}));
+        }))
+      : el("p", {class: "vacio", text: "Ayer no tenías tareas."}));
+
+  const colHoy = el("div", {class: "col"}, el("h3", {text: "Hoy"}),
+    t.hoy.length
+      ? el("ul", {}, ...t.hoy.map((x, i) => {
+          const id = `gt-${i}`;
+          const cb = el("input", {type: "checkbox", id});
+          cb.checked = x.hecho || leer(claveHoy(x));
+          cb.disabled = x.hecho;
+          const meta = x.atrasada ? el("span", {class: "meta atrasada", text: "Atrasada"})
+            : (x.vence ? null : el("span", {class: "meta", text: "Sin fecha"}));
+          const li = el("li", {class: cb.checked ? "hecha" : ""}, cb, el("label", {for: id}, x.titulo, meta));
+          cb.addEventListener("change", () => { guardar(claveHoy(x), cb.checked); li.classList.toggle("hecha", cb.checked); contarHoy(); });
+          return li;
+        }))
+      : el("p", {class: "vacio", text: "No tienes tareas para hoy."}));
+
   contarHoy();
-  return el("div", {class: "bloque"},
-    el("h2", {text: "Checklist"}),
+  b.append(
     el("div", {class: "conteo"},
-      el("div", {}, el("b", {text: `${nAyer}/${total}`}), "Ayer"),
+      el("div", {}, el("b", {text: `${nAyer}/${t.ayer.length}`}), "Ayer"),
       el("div", {class: "hoy"}, bHoy, "Hoy")),
-    el("ul", {class: "tareas"},
-      el("li", {class: "cabecera", "aria-hidden": "true"}, el("span", {text: "Tarea"}), el("span", {text: "Ayer"}), el("span", {text: "Hoy"})),
-      ...filas));
+    el("div", {class: "vs"}, colAyer, colHoy),
+    el("p", {class: "nota", text: "Lo que marcas aquí se guarda en este dispositivo. Para que quede hecha en Google, complétala en Google Tasks."}));
+  return b;
 }
 
 function titulares(secciones){
@@ -612,7 +609,7 @@ encabezado();
 const dia = $("#dia");
 if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 if (DATA.clima) dia.append(bloqueClima(DATA.clima));
-dia.append(bloqueAgenda(DATA.eventos), bloqueTareas(DATA.tareas), bloqueChecklist(DATA.checklist));
+dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.tareas));
 titulares(DATA.secciones);
 </script>
 </body>
@@ -655,13 +652,9 @@ def main():
         except Exception as e:  # noqa: BLE001
             aviso(f"calendario no disponible: {e}")
 
-    with open(os.path.join(HERE, "checklist.json"), encoding="utf-8") as f:
-        checklist = json.load(f)
-
     data = {
         "generado": ahora.strftime("%d/%m/%Y %H:%M"),
         "fecha": hoy_iso,
-        "checklist": checklist,
         "clima": clima_hoy,
         "boca": boca,
         "eventos": [e for e in eventos if e["dia"] == hoy_iso],
@@ -674,7 +667,7 @@ def main():
         f.write(salida)
     print(f"listo: {sum(len(s['items']) for s in secciones)} titulares, "
           f"{len(data['eventos'])} eventos hoy, "
-          f"{'sin conexión a' if tareas is None else len(tareas)} tareas de Google, "
+          f"{'sin conexión a' if tareas is None else len(tareas['hoy'])} tareas de Google para hoy, "
           f"{len(boca)} partido(s) de Boca")
 
 
