@@ -5,7 +5,9 @@ Sin API de pago:
 - Titulares: RSS (Google News y medios directos), filtrados por fuentes confiables.
 - Clima: Open-Meteo (sin clave).
 - Boca: marcador público de ESPN (endpoint no oficial, puede cambiar).
-- Calendario: dirección secreta iCal de Google Calendar, en la variable CALENDAR_ICS_URL.
+- Calendario y tareas: API de Google Calendar y Google Tasks, con los secretos
+  GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REFRESH_TOKEN (ver obtener_token.py).
+  Respaldo para el calendario: dirección secreta iCal en CALENDAR_ICS_URL.
 """
 
 import datetime as dt
@@ -220,6 +222,102 @@ def partidos_boca(fecha):
     return partidos
 
 
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+DIAS_TAREAS = 7  # tareas que vencen en los próximos N días (más las atrasadas y sin fecha)
+
+
+def google_token():
+    """Cambia el refresh token guardado en los secretos por un token de acceso."""
+    claves = ("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN")
+    cid, secreto, refresh = (os.environ.get(k) for k in claves)
+    if not (cid and secreto and refresh):
+        aviso("faltan los secretos de Google: sin calendario ni tareas por API")
+        return None
+    datos = urllib.parse.urlencode({
+        "client_id": cid, "client_secret": secreto,
+        "refresh_token": refresh, "grant_type": "refresh_token",
+    }).encode()
+    req = urllib.request.Request(GOOGLE_TOKEN_URL, data=datos, headers=UA)
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return json.loads(r.read())["access_token"]
+
+
+def google_get(url, token, params=None):
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={**UA, "Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return json.loads(r.read())
+
+
+def calendario_google(token, desde, hasta, hoy):
+    """Eventos de hoy en todos los calendarios que tienes visibles en Google Calendar."""
+    base = "https://www.googleapis.com/calendar/v3"
+    calendarios = google_get(f"{base}/users/me/calendarList", token).get("items", [])
+    out = []
+    for cal in calendarios:
+        if not (cal.get("selected") or cal.get("primary")):
+            continue
+        datos = google_get(
+            f"{base}/calendars/{urllib.parse.quote(cal['id'], safe='')}/events", token, {
+                "timeMin": desde.isoformat(), "timeMax": hasta.isoformat(),
+                "singleEvents": "true", "orderBy": "startTime", "maxResults": "50",
+            })
+        for ev in datos.get("items", []):
+            if ev.get("status") == "cancelled":
+                continue
+            inicio = ev.get("start", {})
+            if "dateTime" in inicio:
+                loc = dt.datetime.fromisoformat(inicio["dateTime"].replace("Z", "+00:00")).astimezone(TZ)
+                dia, hora = loc.date().isoformat(), loc.strftime("%H:%M")
+            else:
+                ini = dt.date.fromisoformat(inicio["date"])
+                fin = dt.date.fromisoformat(ev.get("end", {}).get("date", inicio["date"]))
+                dia = hoy.isoformat() if ini <= hoy < fin else ini.isoformat()
+                hora = "Todo el día"
+            out.append({
+                "dia": dia, "hora": hora,
+                "titulo": ev.get("summary", "(sin título)"),
+                "lugar": ev.get("location", ""),
+            })
+    # Los eventos de todo el día primero, después por hora.
+    return sorted(out, key=lambda e: (e["dia"], e["hora"] != "Todo el día", e["hora"]))
+
+
+def tareas_google(token, hoy):
+    """Tareas pendientes de todas tus listas de Google Tasks."""
+    base = "https://tasks.googleapis.com/tasks/v1"
+    limite = (hoy + dt.timedelta(days=DIAS_TAREAS)).isoformat()
+    listas = google_get(f"{base}/users/@me/lists", token, {"maxResults": "100"}).get("items", [])
+    out = []
+    for lista in listas:
+        pagina = None
+        while True:
+            params = {"showCompleted": "false", "maxResults": "100"}
+            if pagina:
+                params["pageToken"] = pagina
+            datos = google_get(
+                f"{base}/lists/{urllib.parse.quote(lista['id'], safe='')}/tasks", token, params)
+            for t in datos.get("items", []):
+                titulo = (t.get("title") or "").strip()
+                if not titulo or t.get("status") != "needsAction":
+                    continue
+                vence = (t.get("due") or "")[:10] or None
+                if vence and vence > limite:
+                    continue
+                out.append({
+                    "titulo": titulo,
+                    "lista": lista.get("title", ""),
+                    "vence": vence,
+                    "atrasada": bool(vence and vence < hoy.isoformat()),
+                })
+            pagina = datos.get("nextPageToken")
+            if not pagina:
+                break
+    # Atrasadas y de hoy primero, después las próximas, al final las sin fecha.
+    return sorted(out, key=lambda t: (t["vence"] is None, t["vence"] or ""))
+
+
 def leer_calendario(desde, hasta):
     url = os.environ.get("CALENDAR_ICS_URL")
     if not url:
@@ -307,10 +405,18 @@ h1{font-size:clamp(2.4rem,8vw,3.5rem);line-height:1;letter-spacing:-.025em;font-
 
 /* Agenda */
 .agenda{list-style:none;margin:0;padding:0}
-.agenda li{display:grid;grid-template-columns:4.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
+.agenda li{display:grid;grid-template-columns:5.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
 .agenda .hora{font-family:var(--display);font-weight:600;color:var(--hoja);font-variant-numeric:tabular-nums}
 .agenda .lugar{display:block;font-size:.88rem;color:var(--tierra)}
 .vacio{color:var(--tierra);font-style:italic;margin:0}
+
+/* Google Tasks */
+.gtareas{list-style:none;margin:0;padding:0}
+.gtareas li{display:grid;grid-template-columns:5.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
+.gtareas .vence{font-family:var(--display);font-weight:600;font-size:.9rem;color:var(--tierra)}
+.gtareas .vence.atrasada{color:var(--cereza)}
+.gtareas .vence.hoy{color:var(--hoja)}
+.gtareas .lista{display:block;font-size:.85rem;color:var(--tierra)}
 
 /* Checklist: ayer vs hoy */
 .conteo{display:flex;gap:28px;font-family:var(--display);margin:0 0 12px}
@@ -428,6 +534,32 @@ function bloqueAgenda(eventos){
   return b;
 }
 
+function bloqueTareas(tareas){
+  const b = el("div", {class: "bloque"}, el("h2", {text: "Tareas de Google"}));
+  if (tareas == null) {
+    b.append(el("p", {class: "vacio", text: "Google Tasks no está conectado. Agrega los secretos de Google en el repositorio para ver tus tareas aquí."}));
+    return b;
+  }
+  if (!tareas.length) {
+    b.append(el("p", {class: "vacio", text: "No tienes tareas pendientes para esta semana."}));
+    return b;
+  }
+  const etiqueta = t => {
+    if (!t.vence) return ["Sin fecha", ""];
+    if (t.atrasada) return ["Atrasada", " atrasada"];
+    if (t.vence === HOY) return ["Hoy", " hoy"];
+    const txt = new Date(t.vence + "T12:00:00").toLocaleDateString("es-CL", {weekday: "short", day: "numeric"});
+    return [txt.charAt(0).toUpperCase() + txt.slice(1), ""];
+  };
+  b.append(el("ul", {class: "gtareas"}, ...tareas.map(t => {
+    const [txt, clase] = etiqueta(t);
+    return el("li", {},
+      el("span", {class: "vence" + clase, text: txt}),
+      el("span", {}, t.titulo, t.lista ? el("span", {class: "lista", text: t.lista}) : null));
+  })));
+  return b;
+}
+
 function bloqueChecklist(lista){
   const total = lista.length;
   const nAyer = lista.filter(t => leer(`chk|${AYER}|${t}`)).length;
@@ -480,7 +612,7 @@ encabezado();
 const dia = $("#dia");
 if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 if (DATA.clima) dia.append(bloqueClima(DATA.clima));
-dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.checklist));
+dia.append(bloqueAgenda(DATA.eventos), bloqueTareas(DATA.tareas), bloqueChecklist(DATA.checklist));
 titulares(DATA.secciones);
 </script>
 </body>
@@ -497,14 +629,31 @@ def main():
     clima_hoy = clima()
     boca = partidos_boca(hoy)
 
+    desde = dt.datetime.combine(hoy, dt.time(0), tzinfo=TZ)
+    hasta = dt.datetime.combine(hoy + dt.timedelta(days=1), dt.time(0), tzinfo=TZ)
+    eventos, tareas = [], None  # tareas = None significa "Google Tasks no conectado"
+
+    token = None
     try:
-        eventos = leer_calendario(
-            dt.datetime.combine(hoy, dt.time(0), tzinfo=TZ),
-            dt.datetime.combine(hoy + dt.timedelta(days=1), dt.time(0), tzinfo=TZ),
-        )
+        token = google_token()
     except Exception as e:  # noqa: BLE001
-        aviso(f"calendario no disponible: {e}")
-        eventos = []
+        aviso(f"no se pudo autorizar con Google: {e}")
+
+    if token:
+        try:
+            eventos = calendario_google(token, desde, hasta, hoy)
+        except Exception as e:  # noqa: BLE001
+            aviso(f"Google Calendar no disponible: {e}")
+        try:
+            tareas = tareas_google(token, hoy)
+        except Exception as e:  # noqa: BLE001
+            aviso(f"Google Tasks no disponible: {e}")
+    else:
+        # Respaldo: dirección secreta iCal, si está configurada.
+        try:
+            eventos = leer_calendario(desde, hasta)
+        except Exception as e:  # noqa: BLE001
+            aviso(f"calendario no disponible: {e}")
 
     with open(os.path.join(HERE, "checklist.json"), encoding="utf-8") as f:
         checklist = json.load(f)
@@ -516,6 +665,7 @@ def main():
         "clima": clima_hoy,
         "boca": boca,
         "eventos": [e for e in eventos if e["dia"] == hoy_iso],
+        "tareas": tareas,
         "secciones": secciones,
     }
     salida = PLANTILLA.replace(
@@ -523,7 +673,9 @@ def main():
     with open(os.path.join(HERE, "index.html"), "w", encoding="utf-8") as f:
         f.write(salida)
     print(f"listo: {sum(len(s['items']) for s in secciones)} titulares, "
-          f"{len(data['eventos'])} eventos hoy, {len(boca)} partido(s) de Boca")
+          f"{len(data['eventos'])} eventos hoy, "
+          f"{'sin conexión a' if tareas is None else len(tareas)} tareas de Google, "
+          f"{len(boca)} partido(s) de Boca")
 
 
 if __name__ == "__main__":
