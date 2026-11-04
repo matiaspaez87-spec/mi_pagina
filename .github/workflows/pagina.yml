@@ -2,7 +2,8 @@ name: Página diaria
 
 on:
   schedule:
-    - cron: "0 9 * * *"
+    - cron: "30 7 * * *"
+    - cron: "30 8 * * *"
   workflow_dispatch:
 
 permissions:
