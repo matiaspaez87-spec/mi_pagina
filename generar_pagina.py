@@ -357,112 +357,97 @@ PLANTILLA = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#EEF1E7">
+<meta name="theme-color" content="#E9EAE2">
+<meta name="color-scheme" content="light only">
 <title>Mi día</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@400;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
+/* Cuaderno de campo: papel cuadriculado, tinta azul, lápiz y un solo destacador. */
 :root{
-  --neblina:#EEF1E7; --papel:#FAFBF6; --tinta:#1E2620; --hoja:#2F5D3A;
-  --cereza:#A3172E; --tierra:#6E5A47; --cielo:#4F86A0; --linea:#D3DACB;
-  --display:"Bricolage Grotesque",system-ui,sans-serif;
-  --lectura:"Newsreader",Georgia,serif;
+  --papel:#E9EAE2; --cuadro:#D3DCE2; --tinta:#1F3A6B; --lapiz:#4E5257; --fuerte:#22252A;
+  --margen:#D98C8C; --destacador:#F4E36B;
+  --texto:"Bitter",Georgia,serif; --mano:"Caveat","Segoe Print","Comic Sans MS",cursive;
 }
-@media (prefers-color-scheme:dark){:root{
-  --neblina:#141A16; --papel:#1B231E; --tinta:#E4EADF; --hoja:#8CC59A;
-  --cereza:#E35A70; --tierra:#B7A28C; --cielo:#79AFC6; --linea:#2C3830;
-}}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--neblina);color:var(--tinta);font:17px/1.55 var(--lectura)}
-.pagina{max-width:1120px;margin:0 auto;padding:28px 20px 64px;display:grid;gap:44px}
+html{-webkit-text-size-adjust:100%;color-scheme:light only}
+body{margin:0;color:var(--lapiz);font:16px/1.55 var(--texto);background-color:var(--papel);
+  background-image:linear-gradient(var(--cuadro) 1px,transparent 1px),linear-gradient(90deg,var(--cuadro) 1px,transparent 1px);
+  background-size:24px 24px}
+.pagina{max-width:1100px;margin:0 auto;padding:22px 18px 48px 46px;position:relative;display:grid;gap:8px}
+.pagina::before{content:"";position:absolute;top:0;bottom:0;left:30px;width:2px;background:var(--margen);opacity:.7}
 @media (min-width:900px){
-  .pagina{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:64px;padding-top:52px}
-  .dia{align-self:start}
+  .pagina{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;padding:44px 32px 64px 72px}
+  .pagina::before{left:48px}
 }
-h1,h2{font-family:var(--display)}
+.mano{font-family:var(--mano);color:var(--tinta)}
+.resaltado{background:linear-gradient(transparent 35%,var(--destacador) 35%,var(--destacador) 88%,transparent 88%);padding:0 3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
 
 /* Encabezado */
-.saludo{font-family:var(--display);font-size:1rem;color:var(--tierra);margin:0}
-h1{font-size:clamp(2.4rem,8vw,3.5rem);line-height:1;letter-spacing:-.025em;font-weight:800;margin:.12em 0 .3em}
-.actualizado{font-family:var(--display);font-size:.8rem;color:var(--tierra);margin:0 0 30px}
+.saludo{font-family:var(--mano);font-size:1.55rem;color:var(--tinta);margin:0;line-height:1.1}
+h1{font-family:var(--texto);font-weight:700;color:var(--tinta);font-size:clamp(2rem,7vw,2.6rem);line-height:1.05;margin:4px 0 6px}
+.sub{font-size:.85rem;margin:0 0 22px}
+h2{font-family:var(--texto);font-weight:700;color:var(--tinta);font-size:1.15rem;margin:28px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .mano{font-size:1.35rem;font-weight:500;color:var(--lapiz)}
 
-/* Clima: rango del día sobre una escala fija de -5 a 40 °C */
-.clima{margin:0 0 34px}
-.temps{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font-family:var(--display)}
-.temps .ahora{font-size:3.4rem;font-weight:800;line-height:1;letter-spacing:-.04em}
-.temps .rango{font-size:.95rem;color:var(--tierra)}
-.escala{position:relative;height:10px;border-radius:5px;background:var(--linea);margin:16px 0 6px}
-.escala .tramo{position:absolute;top:0;bottom:0;border-radius:5px;background:linear-gradient(90deg,#6FA3B8,#D9A23A 55%,var(--cereza))}
-.escala .marca{position:absolute;top:-6px;width:4px;height:22px;border-radius:2px;background:var(--tinta);transform:translateX(-50%);transition:left 1s cubic-bezier(.2,.8,.2,1)}
-.leyenda{display:flex;justify-content:space-between;font-family:var(--display);font-size:.72rem;color:var(--tierra)}
-.lluvia{display:flex;align-items:center;gap:12px;margin-top:16px;font-family:var(--display);font-size:.9rem}
-.lluvia .barra{flex:1;height:6px;border-radius:3px;background:var(--linea);overflow:hidden}
-.lluvia .barra span{display:block;height:100%;background:var(--cielo)}
-.lluvia b{font-variant-numeric:tabular-nums;min-width:3ch;text-align:right}
+/* Clima: regla de -5 a 40 °C con el rango del día marcado con destacador */
+.clima{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:end}
+.clima .grande{font-family:var(--mano);font-weight:700;font-size:4.4rem;line-height:.8;color:var(--tinta)}
+.clima p{margin:0;font-size:.95rem}
+.regla{grid-column:1/-1;position:relative;height:28px;margin-top:10px;border-bottom:2px solid var(--tinta)}
+.regla i{position:absolute;bottom:-2px;width:1px;height:8px;background:var(--tinta)}
+.regla .rango{position:absolute;bottom:-5px;height:8px;background:var(--destacador);border:1.5px solid var(--tinta);border-radius:4px}
+.regla .ahora{position:absolute;bottom:6px;font-family:var(--mano);font-size:1.15rem;color:var(--tinta);transform:translateX(-50%);white-space:nowrap;transition:left 1s cubic-bezier(.2,.8,.2,1)}
+.escala{grid-column:1/-1;display:flex;justify-content:space-between;font-family:var(--mano);font-size:1.05rem}
 
 /* Boca */
-.boca{display:grid;grid-template-columns:auto 1fr;column-gap:16px;align-items:center;background:#0E3A73;color:#fff;border-radius:6px;padding:12px 16px 14px;margin:0 0 30px;font-family:var(--display);border-bottom:6px solid #F2B705}
-.boca strong{grid-row:span 2;font-size:1.7rem;font-weight:800;color:#F2B705;letter-spacing:-.02em}
-.boca .cuando{font-weight:600}
-.boca .detalle{font-size:.85rem;opacity:.85}
+.boca{margin:22px 0 0;font-size:1rem}
+.boca b{color:var(--fuerte)}
 
-.bloque{margin:0 0 34px}
-.bloque h2{font-size:1.2rem;font-weight:600;margin:0 0 10px;letter-spacing:-.01em}
+/* Listas */
+ul{list-style:none;margin:0;padding:0}
+.agenda li{display:grid;grid-template-columns:4.2em 1fr;gap:8px;padding:5px 0}
+.agenda .hora{font-family:var(--mano);font-weight:700;font-size:1.3rem;color:var(--tinta);line-height:1.2}
+.agenda .lugar{display:block;font-family:var(--mano);font-size:1.1rem;color:var(--lapiz)}
+.vacio{font-family:var(--mano);font-size:1.2rem;margin:0}
 
-/* Agenda */
-.agenda{list-style:none;margin:0;padding:0}
-.agenda li{display:grid;grid-template-columns:5.6em 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--linea)}
-.agenda .hora{font-family:var(--display);font-weight:600;color:var(--hoja);font-variant-numeric:tabular-nums}
-.agenda .lugar{display:block;font-size:.88rem;color:var(--tierra)}
-.vacio{color:var(--tierra);font-style:italic;margin:0}
-
-/* Checklist: tareas de Google, ayer vs hoy */
-.conteo{display:flex;gap:28px;font-family:var(--display);margin:0 0 12px}
-.conteo div{font-size:.85rem;color:var(--tierra)}
-.conteo b{display:block;font-size:1.7rem;line-height:1.1;font-weight:800;color:var(--tinta);font-variant-numeric:tabular-nums}
-.conteo .hoy b{color:var(--cereza)}
-.vs{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
-.vs h3{font-family:var(--display);font-size:.8rem;font-weight:600;color:var(--tierra);margin:0 0 4px}
-.vs ul{list-style:none;margin:0;padding:0}
-.vs li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;padding:9px 0;border-top:1px solid var(--linea);font-size:.95rem;line-height:1.35}
+/* Checklist: ayer vs hoy, con casillas dibujadas */
+.vs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.vs h3{font-family:var(--mano);font-weight:700;font-size:1.5rem;color:var(--tinta);margin:0;border-bottom:1.5px solid var(--tinta);line-height:1.2}
+.vs li{display:grid;grid-template-columns:22px 1fr;gap:8px;padding:7px 0;font-size:.95rem;line-height:1.3}
 .vs label{cursor:pointer}
-.vs .marca-ayer{margin-top:5px;width:12px;height:12px;border-radius:50%;border:2px solid var(--tierra)}
-.vs .marca-ayer.ok{background:var(--hoja);border-color:var(--hoja)}
-.vs input{appearance:none;-webkit-appearance:none;width:24px;height:24px;margin:0;border-radius:50%;border:2px solid var(--cereza);background:transparent;cursor:pointer;display:grid;place-content:center}
-.vs input:checked{background:var(--cereza)}
-.vs input:checked::after{content:"";width:6px;height:11px;border:solid var(--neblina);border-width:0 3px 3px 0;transform:translateY(-2px) rotate(45deg)}
+.casilla,.vs input{width:18px;height:18px;margin:2px 0 0;border:2px solid var(--tinta);border-radius:2px;transform:rotate(-2deg);position:relative;background:transparent}
+.vs input{appearance:none;-webkit-appearance:none;cursor:pointer}
 .vs input:disabled{cursor:default}
-.vs li.hecha label{color:var(--tierra);text-decoration:line-through;text-decoration-color:var(--cereza)}
-.vs .meta{display:block;font-size:.8rem;color:var(--tierra)}
-.vs .meta.atrasada{color:var(--cereza);font-weight:600}
-.vs .vacio{font-size:.9rem;padding:9px 0;border-top:1px solid var(--linea)}
-.nota{font-size:.8rem;color:var(--tierra);margin:12px 0 0}
+.casilla.ok::after,.vs input:checked::after{content:"✓";position:absolute;left:1px;top:-14px;font-family:var(--mano);font-weight:700;font-size:1.65rem;color:var(--tinta)}
+.vs li.hecha label{text-decoration:line-through;text-decoration-color:var(--tinta)}
+.vs .meta{display:block;font-family:var(--mano);font-size:1.08rem;color:var(--lapiz)}
+.vs .vacio{padding:7px 0}
+.nota{font-family:var(--mano);font-size:1.1rem;margin:12px 0 0}
 
 /* Titulares */
-.seccion{margin:0 0 40px}
-.seccion h2{font-size:1.3rem;font-weight:600;letter-spacing:-.01em;margin:0;padding-bottom:8px;border-bottom:2px solid var(--tinta)}
-.seccion.destacada{background:var(--papel);border-left:6px solid var(--hoja);border-radius:6px;padding:20px 22px 6px}
-.seccion.destacada h2{font-size:1.6rem;font-weight:800;color:var(--hoja);border-bottom-color:var(--hoja)}
-.noticias{list-style:none;margin:0;padding:0}
-.noticias li{padding:14px 0;border-bottom:1px solid var(--linea)}
-.noticias li:last-child{border-bottom:0}
-.noticias a{color:var(--tinta);text-decoration:none;font-size:1.13rem;line-height:1.3;font-weight:500}
-.noticias a:hover{text-decoration:underline;text-decoration-color:var(--cereza);text-underline-offset:3px}
-.noticias p{margin:6px 0 0;color:var(--tierra);font-size:.95rem;line-height:1.5;max-width:62ch}
-.noticias .fuente{display:block;margin-top:6px;font-family:var(--display);font-size:.78rem;font-weight:600;color:var(--hoja)}
+.noticias li{padding:8px 0}
+.noticias a{color:var(--fuerte);text-decoration:none;font-weight:700;font-size:1rem;line-height:1.35}
+.noticias a:hover{text-decoration:underline;text-decoration-color:var(--tinta);text-underline-offset:3px}
+.noticias p{margin:4px 0 0;font-size:.92rem;line-height:1.45;max-width:62ch}
+.noticias .fuente{display:block;font-family:var(--mano);font-size:1.18rem;color:var(--tinta);line-height:1.2}
+.prioridad h2::before{content:"★";color:var(--tinta);margin-left:-27px;width:17px;font-size:1rem}
+@media (min-width:900px){.prioridad h2::before{margin-left:-35px;width:25px}}
+.titulares > section:first-child h2{margin-top:6px}
 
-:focus-visible{outline:3px solid var(--hoja);outline-offset:3px;border-radius:2px}
+:focus-visible{outline:3px solid var(--tinta);outline-offset:3px;border-radius:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <main class="pagina">
   <section class="dia" aria-label="Tu día">
-    <p class="saludo" id="saludo"></p>
-    <h1 id="fecha"></h1>
-    <p class="actualizado" id="generado"></p>
+    <header>
+      <p class="saludo" id="saludo"></p>
+      <h1 id="fecha"></h1>
+      <p class="sub" id="generado"></p>
+    </header>
     <div id="dia"></div>
   </section>
   <section class="titulares" aria-label="Titulares" id="titulares"></section>
@@ -497,50 +482,48 @@ function encabezado(){
   $("#saludo").textContent = (h < 12 ? "Buenos días" : h < 20 ? "Buenas tardes" : "Buenas noches") + ", Matías";
   $("#fecha").textContent = fmtFecha(DATA.fecha);
   const [f, hora] = DATA.generado.split(" ");
-  $("#generado").textContent = `Titulares actualizados el ${f} a las ${hora}`;
+  $("#generado").textContent = `Santiago, Chile. Titulares actualizados el ${f} a las ${hora}.`;
 }
 
 function bloqueClima(c){
   const pct = v => Math.min(100, Math.max(0, (v + 5) / 45 * 100));
-  const marca = el("span", {class: "marca", style: `left:${pct(c.min)}%`});
+  const marcas = [];
+  for (let g = -5; g <= 40; g += 5) marcas.push(el("i", {style: `left:${pct(g)}%`}));
+  const flecha = el("span", {class: "ahora", style: `left:${pct(c.min)}%`, text: "ahora ↓"});
   const caja = el("div", {class: "clima"},
-    el("div", {class: "temps"},
-      el("span", {class: "ahora", text: `${c.actual}°`}),
-      el("span", {class: "rango", text: `Ahora en Santiago. Mínima ${c.min}°, máxima ${c.max}°.`})),
-    el("div", {class: "escala", role: "img", "aria-label": `Temperatura del día entre ${c.min} y ${c.max} grados`},
-      el("span", {class: "tramo", style: `left:${pct(c.min)}%;width:${pct(c.max) - pct(c.min)}%`}),
-      marca),
-    el("div", {class: "leyenda"}, el("span", {text: "−5°"}), el("span", {text: "40°"})),
-    el("div", {class: "lluvia"},
-      el("span", {text: "Probabilidad de lluvia"}),
-      el("span", {class: "barra"}, el("span", {style: `width:${c.lluvia}%`})),
-      el("b", {text: `${c.lluvia}%`})));
-  // Único movimiento de la página: la marca viaja de la mínima a la temperatura actual.
-  requestAnimationFrame(() => requestAnimationFrame(() => { marca.style.left = `${pct(c.actual)}%`; }));
+    el("span", {class: "grande", text: `${c.actual}°`}),
+    el("p", {}, `Mínima ${c.min}°, máxima ${c.max}°.`, el("br"), `Probabilidad de lluvia: ${c.lluvia}%.`),
+    el("div", {class: "regla", role: "img", "aria-label": `Temperatura del día entre ${c.min} y ${c.max} grados; ahora ${c.actual}`},
+      ...marcas,
+      el("span", {class: "rango", style: `left:${pct(c.min)}%;width:${pct(c.max) - pct(c.min)}%`}),
+      flecha),
+    el("div", {class: "escala"}, ...["−5°", "10°", "25°", "40°"].map(t => el("span", {text: t}))));
+  // Único movimiento de la página: la flecha va de la mínima a la temperatura actual.
+  requestAnimationFrame(() => requestAnimationFrame(() => { flecha.style.left = `${pct(c.actual)}%`; }));
   return caja;
 }
 
 function bloqueBoca(partidos){
-  return partidos.map(p => el("div", {class: "boca", role: "status"},
-    el("strong", {text: "Boca"}),
-    el("span", {class: "cuando", text: `Juega hoy a las ${p.hora}`}),
-    el("span", {class: "detalle", text: `${p.partido}, ${p.torneo}`})));
+  return partidos.map(p => el("p", {class: "boca", role: "status"},
+    el("span", {class: "resaltado"}, el("b", {text: `Boca juega hoy a las ${p.hora}`})),
+    ` ${p.partido}, ${p.torneo}.`));
 }
 
 function bloqueAgenda(eventos){
-  const b = el("div", {class: "bloque"}, el("h2", {text: "Agenda de hoy"}));
+  const b = el("div", {}, el("h2", {text: "Agenda de hoy"}));
   if (!eventos.length) {
-    b.append(el("p", {class: "vacio", text: "No tienes eventos en el calendario hoy."}));
+    b.append(el("p", {class: "vacio", text: "Hoy no tienes eventos en el calendario."}));
     return b;
   }
   b.append(el("ul", {class: "agenda"}, ...eventos.map(e => el("li", {},
-    el("span", {class: "hora", text: e.hora}),
+    el("span", {class: "hora", text: e.hora === "Todo el día" ? "todo el día" : e.hora}),
     el("span", {}, e.titulo, e.lugar ? el("span", {class: "lugar", text: e.lugar}) : null)))));
   return b;
 }
 
 function bloqueChecklist(t){
-  const b = el("div", {class: "bloque"}, el("h2", {text: "Checklist"}));
+  const resumen = el("span", {class: "mano"});
+  const b = el("div", {}, el("h2", {}, "Checklist", resumen));
   if (t == null) {
     b.append(el("p", {class: "vacio", text: "Google Tasks no está conectado. Agrega los secretos de Google en el repositorio para ver tus tareas aquí."}));
     return b;
@@ -549,41 +532,39 @@ function bloqueChecklist(t){
   const hechaAyer = x => x.hecho || leer(`gt|${AYER}|${x.id}`);
   const claveHoy = x => `gt|${HOY}|${x.id}`;
   const nAyer = t.ayer.filter(hechaAyer).length;
-  const bHoy = el("b", {});
-  const contarHoy = () => { bHoy.textContent = `${t.hoy.filter(x => x.hecho || leer(claveHoy(x))).length}/${t.hoy.length}`; };
+  const contar = () => {
+    const nHoy = t.hoy.filter(x => x.hecho || leer(claveHoy(x))).length;
+    resumen.textContent = `ayer ${nAyer}/${t.ayer.length}, hoy ${nHoy}/${t.hoy.length}`;
+  };
 
-  const colAyer = el("div", {class: "col"}, el("h3", {text: "Ayer"}),
+  const colAyer = el("div", {}, el("h3", {text: "Ayer"}),
     t.ayer.length
       ? el("ul", {}, ...t.ayer.map(x => {
           const ok = hechaAyer(x);
           return el("li", {},
-            el("span", {class: "marca-ayer" + (ok ? " ok" : ""), role: "img", "aria-label": ok ? "Hecha" : "No hecha"}),
+            el("span", {class: "casilla" + (ok ? " ok" : ""), role: "img", "aria-label": ok ? "Hecha" : "No hecha"}),
             el("span", {text: x.titulo}));
         }))
-      : el("p", {class: "vacio", text: "Ayer no tenías tareas."}));
+      : el("p", {class: "vacio", text: "ayer no tenías tareas"}));
 
-  const colHoy = el("div", {class: "col"}, el("h3", {text: "Hoy"}),
+  const colHoy = el("div", {}, el("h3", {text: "Hoy"}),
     t.hoy.length
       ? el("ul", {}, ...t.hoy.map((x, i) => {
           const id = `gt-${i}`;
           const cb = el("input", {type: "checkbox", id});
           cb.checked = x.hecho || leer(claveHoy(x));
           cb.disabled = x.hecho;
-          const meta = x.atrasada ? el("span", {class: "meta atrasada", text: "Atrasada"})
-            : (x.vence ? null : el("span", {class: "meta", text: "Sin fecha"}));
+          const meta = x.atrasada ? el("span", {class: "meta"}, el("span", {class: "resaltado", text: "atrasada"}))
+            : (x.vence ? null : el("span", {class: "meta", text: "sin fecha"}));
           const li = el("li", {class: cb.checked ? "hecha" : ""}, cb, el("label", {for: id}, x.titulo, meta));
-          cb.addEventListener("change", () => { guardar(claveHoy(x), cb.checked); li.classList.toggle("hecha", cb.checked); contarHoy(); });
+          cb.addEventListener("change", () => { guardar(claveHoy(x), cb.checked); li.classList.toggle("hecha", cb.checked); contar(); });
           return li;
         }))
-      : el("p", {class: "vacio", text: "No tienes tareas para hoy."}));
+      : el("p", {class: "vacio", text: "no tienes tareas para hoy"}));
 
-  contarHoy();
-  b.append(
-    el("div", {class: "conteo"},
-      el("div", {}, el("b", {text: `${nAyer}/${t.ayer.length}`}), "Ayer"),
-      el("div", {class: "hoy"}, bHoy, "Hoy")),
-    el("div", {class: "vs"}, colAyer, colHoy),
-    el("p", {class: "nota", text: "Lo que marcas aquí se guarda en este dispositivo. Para que quede hecha en Google, complétala en Google Tasks."}));
+  contar();
+  b.append(el("div", {class: "vs"}, colAyer, colHoy),
+    el("p", {class: "nota", text: "Lo que marcas aquí queda en este dispositivo. Para que quede hecha en Google, complétala en Google Tasks."}));
   return b;
 }
 
@@ -591,14 +572,15 @@ function titulares(secciones){
   const cont = $("#titulares");
   const llenas = secciones.filter(s => s.items.length);
   if (!llenas.length) {
-    cont.append(el("p", {class: "vacio", text: "No llegaron titulares en esta actualización. Se vuelven a cargar mañana a las 6:00."}));
+    cont.append(el("p", {class: "vacio", text: "No llegaron titulares en esta actualización. Se vuelven a cargar mañana a las 5:30."}));
     return;
   }
+  const EMOJI = /^[\u{1F331}\u{1F69C}]️?\s*/u;
   llenas.forEach(s => {
-    const destacada = /^[\u{1F331}\u{1F69C}]/u.test(s.nombre);
-    cont.append(el("section", {class: "seccion" + (destacada ? " destacada" : "")},
-      el("h2", {text: s.nombre}),
-      el("ul", {class: "noticias"}, ...s.items.map(n => el("li", {},
+    const prioridad = EMOJI.test(s.nombre);
+    cont.append(el("section", {class: "noticias" + (prioridad ? " prioridad" : "")},
+      el("h2", {text: s.nombre.replace(EMOJI, "")}),
+      el("ul", {}, ...s.items.map(n => el("li", {},
         el("a", {href: n.link, target: "_blank", rel: "noopener", text: n.titulo}),
         n.bajada ? el("p", {text: n.bajada}) : null,
         el("span", {class: "fuente", text: n.fuente}))))));
@@ -607,8 +589,8 @@ function titulares(secciones){
 
 encabezado();
 const dia = $("#dia");
-if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 if (DATA.clima) dia.append(bloqueClima(DATA.clima));
+if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.tareas));
 titulares(DATA.secciones);
 </script>
