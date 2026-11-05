@@ -2,13 +2,9 @@ name: Página diaria
 
 on:
   schedule:
-    # Horas en UTC. Chile en horario de verano (septiembre a abril) es UTC-3.
-    # 4:30 y 5:30 en Santiago, más dos respaldos (6:15 y 6:50) por si GitHub se salta una corrida.
-    # En horario de invierno (UTC-4) suma 1 a cada hora.
-    - cron: "30 7 * * *"
-    - cron: "30 8 * * *"
-    - cron: "15 9 * * *"
-    - cron: "50 9 * * *"
+    # Cada 6 horas (UTC), así el cambio de horario de Chile no afecta: la página nunca queda más de ~6 h desactualizada.
+    # Corre a los :17 y no en punto, porque GitHub se salta más corridas a las horas exactas.
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
