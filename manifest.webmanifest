@@ -1,0 +1,22 @@
+{
+  "name": "Mi día",
+  "short_name": "Mi día",
+  "lang": "es-CL",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#E9EAE2",
+  "theme_color": "#E9EAE2",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
