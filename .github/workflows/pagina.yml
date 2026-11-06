@@ -2,9 +2,13 @@ name: Página diaria
 
 on:
   schedule:
-    # Cada 6 horas (UTC), así el cambio de horario de Chile no afecta: la página nunca queda más de ~6 h desactualizada.
-    # Corre a los :17 y no en punto, porque GitHub se salta más corridas a las horas exactas.
-    - cron: "17 */6 * * *"
+    # Horas en UTC. Con el horario de verano de Chile (UTC-3, septiembre a abril):
+    #   08:47 UTC = 5:47 en Santiago, para tomar las primeras noticias del día.
+    #   09:29 UTC = 6:29, respaldo por si GitHub se salta o atrasa la primera.
+    # No van en punto porque GitHub se salta más corridas a las horas exactas.
+    # En horario de invierno (UTC-4, abril a septiembre) suma 1 a la hora: "47 9" y "29 10".
+    - cron: "47 8 * * *"
+    - cron: "29 9 * * *"
   workflow_dispatch:
 
 permissions:
@@ -34,7 +38,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@users.noreply.github.com"
-          git add index.html
+          git add index.html historial.json apple-touch-icon.png icono-512.png manifest.webmanifest
           if git diff --cached --quiet; then
             echo "Sin cambios que publicar"
             exit 0
