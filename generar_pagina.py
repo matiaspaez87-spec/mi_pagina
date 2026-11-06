@@ -39,11 +39,14 @@ FUENTES_OK = {
 }
 
 # Coordenadas aproximadas de Vitacura.
-CLIMA_URL = (
+# Modelo europeo ECMWF (el de referencia mundial, el mismo que usan yr.no y Windy), vía Open-Meteo.
+# Si ese modelo no responde, se usa la mezcla automática de Open-Meteo como respaldo.
+CLIMA_URL_RESPALDO = (
     "https://api.open-meteo.com/v1/forecast?latitude=-33.39&longitude=-70.57"
-    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum"
     "&current=temperature_2m&timezone=America%2FSantiago&forecast_days=1"
 )
+CLIMA_URL = CLIMA_URL_RESPALDO + "&models=ecmwf_ifs025"
 
 
 def gn(q, pais):
@@ -222,17 +225,18 @@ def armar_secciones(hoy):
 
 
 def clima():
-    try:
-        d = json.loads(fetch(CLIMA_URL))
-        return {
-            "actual": round(d["current"]["temperature_2m"]),
-            "min": round(d["daily"]["temperature_2m_min"][0]),
-            "max": round(d["daily"]["temperature_2m_max"][0]),
-            "lluvia": d["daily"]["precipitation_probability_max"][0],
-        }
-    except Exception as e:  # noqa: BLE001
-        aviso(f"clima no disponible: {e}")
-        return None
+    for url in (CLIMA_URL, CLIMA_URL_RESPALDO):
+        try:
+            d = json.loads(fetch(url))
+            return {
+                "actual": round(d["current"]["temperature_2m"]),
+                "min": round(d["daily"]["temperature_2m_min"][0]),
+                "max": round(d["daily"]["temperature_2m_max"][0]),
+                "lluvia": round(d["daily"]["precipitation_sum"][0] or 0, 1),
+            }
+        except Exception as e:  # noqa: BLE001
+            aviso(f"clima no disponible en {url}: {e}")
+    return None
 
 
 def partidos_boca(fecha):
@@ -437,6 +441,7 @@ h2 .mano{font-size:1.35rem;font-weight:700;color:var(--lapiz)}
 .clima{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:end}
 .clima .grande{font-family:var(--mano);font-weight:700;font-size:4.4rem;line-height:.8;color:var(--tinta)}
 .clima p{margin:0;font-size:.95rem}
+.fuente-clima{font-size:.8rem}
 .regla{grid-column:1/-1;position:relative;height:28px;margin-top:10px;border-bottom:2px solid var(--tinta)}
 .regla i{position:absolute;bottom:-2px;width:1px;height:8px;background:var(--tinta)}
 .regla .rango{position:absolute;bottom:-5px;height:8px;background:var(--destacador);border:1.5px solid var(--tinta);border-radius:4px}
@@ -496,6 +501,8 @@ ul{list-style:none;margin:0;padding:0}
 </main>
 <script>
 const DATA = __DATA__;
+const CLIMA_URL = __CLIMA_URL__;
+const CLIMA_URL_RESPALDO = __CLIMA_URL_RESPALDO__;
 const $ = s => document.querySelector(s);
 
 function el(tag, props, ...hijos){
@@ -534,7 +541,8 @@ function bloqueClima(c){
   const flecha = el("span", {class: "ahora", style: `left:${pct(c.min)}%`, text: "ahora ↓"});
   const caja = el("div", {class: "clima"},
     el("span", {class: "grande", text: `${c.actual}°`}),
-    el("p", {}, `Mínima ${c.min}°, máxima ${c.max}°.`, el("br"), `Probabilidad de lluvia: ${c.lluvia}%.`),
+    el("p", {}, `Mínima ${c.min}°, máxima ${c.max}°.`, el("br"), (c.lluvia >= 0.1 ? `Lluvia esperada: ${String(c.lluvia).replace(".", ",")} mm.` : "Sin lluvia pronosticada."),
+      el("br"), el("span", {class: "fuente-clima", text: `Clima consultado a las ${c.hora}.`})),
     el("div", {class: "regla", role: "img", "aria-label": `Temperatura del día entre ${c.min} y ${c.max} grados; ahora ${c.actual}`},
       ...marcas,
       el("span", {class: "rango", style: `left:${pct(c.min)}%;width:${pct(c.max) - pct(c.min)}%`}),
@@ -631,7 +639,19 @@ function titulares(secciones){
 
 encabezado();
 const dia = $("#dia");
-if (DATA.clima) dia.append(bloqueClima(DATA.clima));
+// Clima: primero el que se guardó al generar la página; luego se consulta en vivo cada vez que se abre.
+const cajaClima = el("div", {});
+dia.append(cajaClima);
+if (DATA.clima) cajaClima.append(bloqueClima({...DATA.clima, hora: DATA.generado.split(" ")[1]}));
+const leerClima = url => fetch(url).then(r => r.json()).then(d => ({
+  actual: Math.round(d.current.temperature_2m),
+  min: Math.round(d.daily.temperature_2m_min[0]),
+  max: Math.round(d.daily.temperature_2m_max[0]),
+  lluvia: Math.round((d.daily.precipitation_sum[0] || 0) * 10) / 10,
+  hora: new Date().toLocaleTimeString("es-CL", {hour: "2-digit", minute: "2-digit"}),
+}));
+leerClima(CLIMA_URL).catch(() => leerClima(CLIMA_URL_RESPALDO))
+  .then(c => { if (!isNaN(c.actual)) cajaClima.replaceChildren(bloqueClima(c)); }).catch(() => {});
 if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.tareas));
 titulares(DATA.secciones);
@@ -727,7 +747,9 @@ def main():
         "secciones": secciones,
     }
     salida = PLANTILLA.replace(
-        "__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
+        "__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/")).replace(
+        "__CLIMA_URL_RESPALDO__", json.dumps(CLIMA_URL_RESPALDO)).replace(
+        "__CLIMA_URL__", json.dumps(CLIMA_URL))
     with open(os.path.join(HERE, "index.html"), "w", encoding="utf-8") as f:
         f.write(salida)
     try:
