@@ -57,30 +57,31 @@ MEDIOS_AGRO = ("(site:portalfruticola.com OR site:redagricola.com OR site:mundoa
 
 # Orden = orden en la página. Cada sección:
 #   nombre, feeds, máximo de titulares, orden ("fecha" o "relevancia"),
-#   palabras requeridas en el título (vacío = sin filtro).
+#   palabras requeridas en el título (vacío = sin filtro),
+#   antigüedad máxima en horas (más viejo que eso no se muestra).
 SECCIONES = [
     ("🌱 Agro y exportaciones", [
-        gn("(exportaciones agrícolas OR fruta OR cerezas OR fruticultura OR agricultura OR agroindustria) Chile when:2d", "CL"),
-        gn(f"{MEDIOS_AGRO} when:3d", "CL"),
-    ], 6, "fecha", []),
+        gn("(exportaciones agrícolas OR fruta OR cerezas OR fruticultura OR agricultura OR agroindustria) Chile when:1d", "CL"),
+        gn(f"{MEDIOS_AGRO} when:2d", "CL"),
+    ], 6, "fecha", [], 36),
     ("🚜 Tecnología para el agro", [
         gn("(agtech OR \"agricultura de precisión\" OR \"riego tecnificado\" OR drones agrícolas "
-           "OR \"agricultura digital\" OR biotecnología agrícola OR tecnología agrícola) when:7d", "CL"),
-        gn("(agtech OR \"agricultura de precisión\" OR tecnología agrícola) when:7d", "AR"),
-    ], 5, "fecha", []),
-    ("Chile", [gn("Chile when:1d", "CL")], 5, "fecha", []),
+           "OR \"agricultura digital\" OR biotecnología agrícola OR tecnología agrícola) when:3d", "CL"),
+        gn("(agtech OR \"agricultura de precisión\" OR tecnología agrícola) when:3d", "AR"),
+    ], 5, "fecha", [], 72),
+    ("Chile", [gn("Chile when:1d", "CL")], 5, "fecha", [], 24),
     ("Economía Chile", [
         gn("(dólar OR cobre OR IPSA OR \"Banco Central\" OR inflación) Chile when:1d", "CL"),
-    ], 4, "fecha", ["chile", "cobre", "ipsa", "banco central"]),
+    ], 4, "fecha", ["chile", "cobre", "ipsa", "banco central"], 24),
     ("Global", [
         "https://feeds.bbci.co.uk/mundo/rss.xml",
         "https://rss.dw.com/rdf/rss-sp-all",
         "https://www.france24.com/es/rss",
-    ], 4, "fecha", []),
+    ], 4, "fecha", [], 24),
     # Portada de Google News Argentina: viene ordenada por relevancia.
     ("Argentina (lo más relevante)", [
         "https://news.google.com/rss?hl=es-419&gl=AR&ceid=AR:es-419",
-    ], 3, "relevancia", []),
+    ], 3, "relevancia", [], 24),
 ]
 
 
@@ -159,11 +160,39 @@ def leer_feed(url):
     return items
 
 
-def armar_secciones():
+HISTORIAL = os.path.join(HERE, "historial.json")
+DIAS_HISTORIAL = 21  # un titular mostrado en las últimas 3 semanas no se vuelve a mostrar
+
+
+def clave_titular(titulo):
+    """Normaliza el titular para reconocerlo aunque cambien tildes, mayúsculas o puntuación."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", titulo.lower())
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9 ]+", "", re.sub(r"\s+", " ", t)).strip()[:70]
+
+
+def leer_historial(hoy):
+    try:
+        with open(HISTORIAL, encoding="utf-8") as f:
+            datos = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    limite = (hoy - dt.timedelta(days=DIAS_HISTORIAL)).isoformat()
+    return {k: v for k, v in datos.items() if v >= limite}
+
+
+def armar_secciones(hoy):
+    """Elige los titulares más recientes que no se hayan mostrado en días anteriores."""
     salida = []
     minimo = dt.datetime.min.replace(tzinfo=dt.timezone.utc)
-    vistos = set()  # evita repetir un titular en dos secciones
-    for nombre, urls, maximo, orden, requiere in SECCIONES:
+    ahora = dt.datetime.now(dt.timezone.utc)
+    hoy_iso = hoy.isoformat()
+    historial = leer_historial(hoy)
+    # Lo mostrado hoy se puede repetir si la página se regenera el mismo día; lo de días anteriores, no.
+    ya_vistos = {k for k, dia in historial.items() if dia < hoy_iso}
+    usados = set()  # evita repetir un titular en dos secciones
+    for nombre, urls, maximo, orden, requiere, horas in SECCIONES:
         items = []
         for u in urls:
             items += leer_feed(u)
@@ -172,16 +201,23 @@ def armar_secciones():
 
         sel = []
         for it in items:
-            clave = it["titulo"].lower()[:60]
-            if not clave or clave in vistos:
+            clave = clave_titular(it["titulo"])
+            if not clave or clave in usados or clave in ya_vistos:
+                continue
+            # Solo noticias recientes: fuera lo publicado antes de la ventana de la sección.
+            if it["fecha"] is None or ahora - it["fecha"] > dt.timedelta(hours=horas):
                 continue
             if requiere and not any(p in it["titulo"].lower() for p in requiere):
                 continue
-            vistos.add(clave)
+            usados.add(clave)
+            historial.setdefault(clave, hoy_iso)
             sel.append({k: v for k, v in it.items() if k != "fecha"})
             if len(sel) == maximo:
                 break
         salida.append({"nombre": nombre, "items": sel})
+
+    with open(HISTORIAL, "w", encoding="utf-8") as f:
+        json.dump(dict(sorted(historial.items(), key=lambda kv: kv[1])), f, ensure_ascii=False, indent=0)
     return salida
 
 
@@ -356,8 +392,14 @@ PLANTILLA = r"""<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#E9EAE2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Mi día">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="color-scheme" content="light only">
 <title>Mi día</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -366,8 +408,8 @@ PLANTILLA = r"""<!DOCTYPE html>
 <style>
 /* Cuaderno de campo: papel cuadriculado, tinta azul, lápiz y un solo destacador. */
 :root{
-  --papel:#E9EAE2; --cuadro:#D3DCE2; --tinta:#1F3A6B; --lapiz:#4E5257; --fuerte:#22252A;
-  --margen:#D98C8C; --destacador:#F4E36B;
+  --papel:#E9EAE2; --cuadro:#DCE1E3; --tinta:#12295A; --lapiz:#2B2E33; --fuerte:#0F1114;
+  --margen:#C97878; --destacador:#F2DD4E;
   --texto:"Bitter",Georgia,serif; --mano:"Caveat","Segoe Print","Comic Sans MS",cursive;
 }
 *{box-sizing:border-box}
@@ -375,8 +417,8 @@ html{-webkit-text-size-adjust:100%;color-scheme:light only}
 body{margin:0;color:var(--lapiz);font:16px/1.55 var(--texto);background-color:var(--papel);
   background-image:linear-gradient(var(--cuadro) 1px,transparent 1px),linear-gradient(90deg,var(--cuadro) 1px,transparent 1px);
   background-size:24px 24px}
-.pagina{max-width:1100px;margin:0 auto;padding:22px 18px 48px 46px;position:relative;display:grid;gap:8px}
-.pagina::before{content:"";position:absolute;top:0;bottom:0;left:30px;width:2px;background:var(--margen);opacity:.7}
+.pagina{max-width:1100px;margin:0 auto;padding:calc(22px + env(safe-area-inset-top)) calc(18px + env(safe-area-inset-right)) calc(48px + env(safe-area-inset-bottom)) 46px;position:relative;display:grid;gap:8px}
+.pagina::before{content:"";position:absolute;top:0;bottom:0;left:30px;width:2px;background:var(--margen)}
 @media (min-width:900px){
   .pagina{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;padding:44px 32px 64px 72px}
   .pagina::before{left:48px}
@@ -389,7 +431,7 @@ body{margin:0;color:var(--lapiz);font:16px/1.55 var(--texto);background-color:va
 h1{font-family:var(--texto);font-weight:700;color:var(--tinta);font-size:clamp(2rem,7vw,2.6rem);line-height:1.05;margin:4px 0 6px}
 .sub{font-size:.85rem;margin:0 0 22px}
 h2{font-family:var(--texto);font-weight:700;color:var(--tinta);font-size:1.15rem;margin:28px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-h2 .mano{font-size:1.35rem;font-weight:500;color:var(--lapiz)}
+h2 .mano{font-size:1.35rem;font-weight:700;color:var(--lapiz)}
 
 /* Clima: regla de -5 a 40 °C con el rango del día marcado con destacador */
 .clima{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:end}
@@ -398,8 +440,8 @@ h2 .mano{font-size:1.35rem;font-weight:500;color:var(--lapiz)}
 .regla{grid-column:1/-1;position:relative;height:28px;margin-top:10px;border-bottom:2px solid var(--tinta)}
 .regla i{position:absolute;bottom:-2px;width:1px;height:8px;background:var(--tinta)}
 .regla .rango{position:absolute;bottom:-5px;height:8px;background:var(--destacador);border:1.5px solid var(--tinta);border-radius:4px}
-.regla .ahora{position:absolute;bottom:6px;font-family:var(--mano);font-size:1.15rem;color:var(--tinta);transform:translateX(-50%);white-space:nowrap;transition:left 1s cubic-bezier(.2,.8,.2,1)}
-.escala{grid-column:1/-1;display:flex;justify-content:space-between;font-family:var(--mano);font-size:1.05rem}
+.regla .ahora{position:absolute;bottom:6px;font-family:var(--mano);font-weight:700;font-size:1.2rem;color:var(--tinta);transform:translateX(-50%);white-space:nowrap;transition:left 1s cubic-bezier(.2,.8,.2,1)}
+.escala{grid-column:1/-1;display:flex;justify-content:space-between;font-family:var(--mano);font-weight:700;font-size:1.1rem;color:var(--tinta)}
 
 /* Boca */
 .boca{margin:22px 0 0;font-size:1rem}
@@ -409,8 +451,8 @@ h2 .mano{font-size:1.35rem;font-weight:500;color:var(--lapiz)}
 ul{list-style:none;margin:0;padding:0}
 .agenda li{display:grid;grid-template-columns:4.2em 1fr;gap:8px;padding:5px 0}
 .agenda .hora{font-family:var(--mano);font-weight:700;font-size:1.3rem;color:var(--tinta);line-height:1.2}
-.agenda .lugar{display:block;font-family:var(--mano);font-size:1.1rem;color:var(--lapiz)}
-.vacio{font-family:var(--mano);font-size:1.2rem;margin:0}
+.agenda .lugar{display:block;font-family:var(--mano);font-weight:700;font-size:1.15rem;color:var(--lapiz)}
+.vacio{font-family:var(--mano);font-weight:700;font-size:1.25rem;color:var(--lapiz);margin:0}
 
 /* Checklist: ayer vs hoy, con casillas dibujadas */
 .vs{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -422,16 +464,16 @@ ul{list-style:none;margin:0;padding:0}
 .vs input:disabled{cursor:default}
 .casilla.ok::after,.vs input:checked::after{content:"✓";position:absolute;left:1px;top:-14px;font-family:var(--mano);font-weight:700;font-size:1.65rem;color:var(--tinta)}
 .vs li.hecha label{text-decoration:line-through;text-decoration-color:var(--tinta)}
-.vs .meta{display:block;font-family:var(--mano);font-size:1.08rem;color:var(--lapiz)}
+.vs .meta{display:block;font-family:var(--mano);font-weight:700;font-size:1.12rem;color:var(--lapiz)}
 .vs .vacio{padding:7px 0}
-.nota{font-family:var(--mano);font-size:1.1rem;margin:12px 0 0}
+.nota{font-family:var(--mano);font-weight:700;font-size:1.15rem;margin:12px 0 0}
 
 /* Titulares */
 .noticias li{padding:8px 0}
 .noticias a{color:var(--fuerte);text-decoration:none;font-weight:700;font-size:1rem;line-height:1.35}
 .noticias a:hover{text-decoration:underline;text-decoration-color:var(--tinta);text-underline-offset:3px}
 .noticias p{margin:4px 0 0;font-size:.92rem;line-height:1.45;max-width:62ch}
-.noticias .fuente{display:block;font-family:var(--mano);font-size:1.18rem;color:var(--tinta);line-height:1.2}
+.noticias .fuente{display:block;font-family:var(--mano);font-weight:700;font-size:1.2rem;color:var(--tinta);line-height:1.2}
 .prioridad h2::before{content:"★";color:var(--tinta);margin-left:-27px;width:17px;font-size:1rem}
 @media (min-width:900px){.prioridad h2::before{margin-left:-35px;width:25px}}
 .titulares > section:first-child h2{margin-top:6px}
@@ -593,10 +635,51 @@ if (DATA.clima) dia.append(bloqueClima(DATA.clima));
 if (DATA.boca && DATA.boca.length) dia.append(...bloqueBoca(DATA.boca));
 dia.append(bloqueAgenda(DATA.eventos), bloqueChecklist(DATA.tareas));
 titulares(DATA.secciones);
+
+// Abierta como app en el iPhone no hay botón de recargar: al volver después de 10 minutos, se recarga sola.
+const CARGADA = Date.now();
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && Date.now() - CARGADA > 10 * 60 * 1000) location.reload();
+});
 </script>
 </body>
 </html>
 """
+
+
+def crear_app_iphone():
+    """Ícono y manifiesto para abrir la página como app desde la pantalla de inicio."""
+    from PIL import Image, ImageDraw
+
+    def icono(tam):
+        f = tam / 180
+        img = Image.new("RGB", (tam, tam), "#E9EAE2")
+        d = ImageDraw.Draw(img)
+        paso = round(18 * f)
+        for x in range(0, tam, paso):
+            d.line([(x, 0), (x, tam)], fill="#D3DAD9", width=max(1, round(f)))
+            d.line([(0, x), (tam, x)], fill="#D3DAD9", width=max(1, round(f)))
+        d.line([(round(34 * f), 0), (round(34 * f), tam)], fill="#C97878", width=round(4 * f))
+        # Casilla con su ✓, como en el checklist.
+        caja = [round(58 * f), round(52 * f), round(138 * f), round(132 * f)]
+        d.rounded_rectangle(caja, radius=round(8 * f), outline="#12295A", width=round(9 * f))
+        d.line([(round(72 * f), round(90 * f)), (round(94 * f), round(114 * f)), (round(150 * f), round(36 * f))],
+               fill="#12295A", width=round(15 * f), joint="curve")
+        return img
+
+    icono(180).save(os.path.join(HERE, "apple-touch-icon.png"))
+    icono(512).save(os.path.join(HERE, "icono-512.png"))
+    manifiesto = {
+        "name": "Mi día", "short_name": "Mi día", "lang": "es-CL",
+        "start_url": "./", "scope": "./", "display": "standalone",
+        "background_color": "#E9EAE2", "theme_color": "#E9EAE2",
+        "icons": [
+            {"src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+            {"src": "icono-512.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    }
+    with open(os.path.join(HERE, "manifest.webmanifest"), "w", encoding="utf-8") as f:
+        json.dump(manifiesto, f, ensure_ascii=False, indent=2)
 
 
 def main():
@@ -604,7 +687,7 @@ def main():
     hoy = ahora.date()
     hoy_iso = hoy.isoformat()
 
-    secciones = armar_secciones()
+    secciones = armar_secciones(hoy)
     clima_hoy = clima()
     boca = partidos_boca(hoy)
 
@@ -647,6 +730,10 @@ def main():
         "__DATA__", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
     with open(os.path.join(HERE, "index.html"), "w", encoding="utf-8") as f:
         f.write(salida)
+    try:
+        crear_app_iphone()
+    except Exception as e:  # noqa: BLE001
+        aviso(f"no se pudo crear el ícono de la app: {e}")
     print(f"listo: {sum(len(s['items']) for s in secciones)} titulares, "
           f"{len(data['eventos'])} eventos hoy, "
           f"{'sin conexión a' if tareas is None else len(tareas['hoy'])} tareas de Google para hoy, "
